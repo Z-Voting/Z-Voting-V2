@@ -1,5 +1,6 @@
 import {Context, Contract, Returns, Transaction} from "fabric-contract-api";
 import {Entity} from "../types/entity";
+import {Iterators} from "fabric-shim-api";
 
 export class EntityBasedContract extends Contract {
 
@@ -83,5 +84,84 @@ export class EntityBasedContract extends Contract {
             result = await iterator.next();
         }
         return JSON.stringify(allResults);
+    }
+
+    public async QueryLedger(ctx: Context, queryString: string) {
+        return await this.GetQueryResultForQueryString(ctx, queryString);
+    }
+
+    public async QueryResultExists(ctx: Context, queryString: string) {
+        let resultsIterator = await ctx.stub.getQueryResult(queryString);
+        let firstRecord = await resultsIterator.next();
+
+        return !firstRecord.done;
+    }
+
+    // GetQueryResultForQueryString executes the passed in query string.
+    // Result set is built and returned as a byte array containing the JSON results.
+    async GetQueryResultForQueryString(ctx: Context, queryString: string) {
+
+        let resultsIterator = await ctx.stub.getQueryResult(queryString);
+        let results = await this.GetAllQueryResults(resultsIterator);
+
+        return JSON.stringify(results);
+    }
+
+    // GetAssetHistory returns the chain of custody for an asset since issuance.
+    async GetHistory(ctx: Context, ID: string) {
+
+        let resultsIterator = await ctx.stub.getHistoryForKey(ID);
+        let results = await this.GetAllHistoryResults(resultsIterator);
+
+        return JSON.stringify(results);
+    }
+
+    public async GetAllQueryResults(iterator: Iterators.StateQueryIterator) {
+        let allResults = [];
+        let res = await iterator.next();
+        while (!res.done) {
+            if (res.value && res.value.value.toString()) {
+                let jsonRes: any = {};
+                console.log(res.value.value.toString());
+
+                jsonRes.Key = res.value.key;
+                try {
+                    jsonRes.Record = JSON.parse(res.value.value.toString());
+                } catch (err) {
+                    console.log(err);
+                    jsonRes.Record = res.value.value.toString();
+                }
+
+                allResults.push(jsonRes);
+            }
+            res = await iterator.next();
+        }
+        await iterator.close();
+        return allResults;
+    }
+
+    public async GetAllHistoryResults(iterator: Iterators.HistoryQueryIterator) {
+        let allResults = [];
+        let res = await iterator.next();
+        while (!res.done) {
+            if (res.value && res.value.value.toString()) {
+                let jsonRes: any = {};
+                console.log(res.value.value.toString());
+
+                jsonRes.TxId = res.value.txId;
+                jsonRes.Timestamp = res.value.timestamp;
+                try {
+                    jsonRes.Value = JSON.parse(res.value.value.toString());
+                } catch (err) {
+                    console.log(err);
+                    jsonRes.Value = res.value.value.toString();
+                }
+
+                allResults.push(jsonRes);
+            }
+            res = await iterator.next();
+        }
+        await iterator.close();
+        return allResults;
     }
 }

@@ -1,25 +1,80 @@
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
-import {Asset} from '../types/asset';
 import {EntityBasedContract} from "./entityBasedContract";
+import {Candidate, Election, ElectionStatus} from "../types/election";
+import {extractSubmittingUserOrg, extractSubmittingUserUID} from "../helper/contractHelper";
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
 export class ZVotingContract extends EntityBasedContract {
 
+    // CreateElection creates a new election
     @Transaction()
-    public async InitLedger(ctx: Context): Promise<void> {
-        const assets: Asset[] = [
-            new Asset('asset1', 'blue', 5, 'Tomoko', 300),
-            new Asset('asset2', 'red', 5, 'Brad', 400),
-            new Asset('asset3', 'green', 10, 'Jin Soo', 500),
-            new Asset('asset4', 'yellow', 10, 'Max', 600),
-            new Asset('asset5', 'black', 15, 'Adriana', 700),
-            new Asset('asset6', 'white', 15, 'Michel', 800),
-        ];
+    public async CreateElection(ctx: Context, electionId: string, name: string): Promise<void> {
 
-        for (const asset of assets) {
-            await ctx.stub.putState(asset.ID, Buffer.from(JSON.stringify(asset)));
-            console.info(`Asset ${asset.ID} initialized`);
+        const ownerId = extractSubmittingUserUID(ctx);
+        const ownerOrg = extractSubmittingUserOrg(ctx);
+        const election = new Election(electionId, name, ElectionStatus.PENDING, ownerId, ownerOrg);
+
+        await this.SaveEntity(ctx, election);
+    }
+
+    // AddCandidate adds a candidate to the election
+    @Transaction()
+    public async AddCandidate(ctx: Context, candidateId: string, name: string, uniqueId: string, electionId: string): Promise<void> {
+        const candidate = new Candidate(candidateId, name, uniqueId, electionId);
+
+        const electionJSON = await this.ReadAsset(ctx, electionId);
+        const election: Election = JSON.parse(electionJSON);
+
+        const submittingUserUID = extractSubmittingUserUID(ctx);
+        if (election.Owner != submittingUserUID) {
+            throw new Error(`Only the election owner can add a candidate`);
         }
+
+        if (election.Status == ElectionStatus.RUNNING || election.Status == ElectionStatus.OVER) {
+            throw new Error(`The election with id: ${electionId} is not accepting any more candidates`);
+        }
+
+        const duplicateCandidateExists = await this.duplicateCandidateExists(ctx, uniqueId, electionId);
+        if (duplicateCandidateExists) {
+            throw new Error(`Another candidate with UniqueID: ${uniqueId} already exists for this election`);
+        }
+
+        //TODO: If we have enough judges and enough Candidates, change status to ready
+        election.Status = ElectionStatus.READY;
+
+        await this.SaveEntity(ctx, candidate);
+        await this.UpdateEntity(ctx, election);
+    }
+
+    @Transaction(false)
+    @Returns('boolean')
+    private async duplicateCandidateExists(ctx: Context, uniqueId: string, electionId: string) {
+        let query: any = {};
+        query.selector = {};
+        query.selector.DocType = 'candidate';
+        query.selector.UniqueId = uniqueId;
+        query.selector.ElectionId = electionId;
+
+        return await this.QueryResultExists(ctx, JSON.stringify(query));
+    }
+
+    // StartElection starts an election if it is ready
+    @Transaction()
+    public async StartElection(ctx: Context, electionId: string): Promise<void> {
+        const electionJSON = await this.ReadEntity(ctx, electionId);
+        const election: Election = JSON.parse(electionJSON);
+
+        const submittingUserUID = extractSubmittingUserUID(ctx);
+        if (election.Owner != submittingUserUID) {
+            throw new Error(`Only the election owner can start an election`);
+        }
+
+        if (election.Status != ElectionStatus.READY) {
+            throw new Error(`The election with id: ${electionId} must be in READY state to start, current state is ${election.Status}`);
+        }
+
+        election.Status = ElectionStatus.RUNNING;
+        await this.UpdateEntity(ctx, election);
     }
 
     // CreateAsset issues a new asset to the world state with given details.

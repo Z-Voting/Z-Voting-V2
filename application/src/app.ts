@@ -52,13 +52,52 @@ async function main() {
             // Get the contract from the network.
             const contract = network.getContract(chaincodeName);
 
-            // Initialize a set of asset data on the channel using the chaincode 'InitLedger' function.
-            // This type of transaction would only be run once by an application the first time it was started after it
-            // deployed the first time. Any updates to the chaincode deployed later would likely not need to run
-            // an "init" type function.
-            console.log('\n--> Submit Transaction: InitLedger, function creates the initial set of assets on the ledger');
-            await contract.submitTransaction('InitLedger');
-            console.log('*** Result: committed');
+            const electionId = Math.floor(Math.random() * 10000);
+
+            // Create election
+            try {
+                console.log('\n--> Submit Transaction: CreateElection');
+                await contract.submitTransaction('CreateElection', `election${electionId}`, `election ${electionId}`);
+                console.log('*** Result: election created');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // This will fail as election is not ready
+            try {
+                console.log('\n--> Submit Transaction: StartElection');
+                await contract.submitTransaction('StartElection', `election${electionId}`);
+                console.log('*** Result: election started');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // One candidate is added
+            try {
+                console.log('\n--> Submit Transaction: AddCandidate');
+                await contract.submitTransaction('AddCandidate', `candidateA_partyA_election${electionId}`, 'Candidate A', 'PartyACandidateA', `election${electionId}`);
+                console.log('*** Result: Candidate Added');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // This fails as same candidate is added again
+            try {
+                console.log('\n--> Submit Transaction: AddCandidate');
+                await contract.submitTransaction('AddCandidate', `candidateA_partyA_election${electionId}`, 'Candidate A', 'PartyACandidateA', `election${electionId}`);
+                console.log('*** Result: Candidate Added');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // Election is started
+            try {
+                console.log('\n--> Submit Transaction: StartElection');
+                await contract.submitTransaction('StartElection', `election${electionId}`);
+                console.log('*** Result: election started');
+            } catch (e) {
+                console.error(e.toString());
+            }
 
             // Let's try a query type operation (function).
             // This will be sent to just one peer and the results will be shown.
