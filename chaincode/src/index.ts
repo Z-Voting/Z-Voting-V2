@@ -1,9 +1,5 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+import {ZVotingContract} from './contracts/zvoting';
 
-import {AssetTransferContract} from './assetTransfer';
+export {ZVotingContract} from './contracts/zvoting';
 
-export {AssetTransferContract} from './assetTransfer';
-
-export const contracts: any[] = [AssetTransferContract];
+export const contracts = [ZVotingContract];

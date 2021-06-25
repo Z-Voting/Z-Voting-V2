@@ -1,62 +1,22 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
+import {Asset} from '../types/asset';
+import {EntityBasedContract} from "./entityBasedContract";
 
-import {Context, Contract, Info, Returns, Transaction} from 'fabric-contract-api';
-import {Asset} from './asset';
-
-@Info({title: 'AssetTransfer', description: 'Smart contract for trading assets'})
-export class AssetTransferContract extends Contract {
+@Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
+export class ZVotingContract extends EntityBasedContract {
 
     @Transaction()
     public async InitLedger(ctx: Context): Promise<void> {
         const assets: Asset[] = [
-            {
-                ID: 'asset1',
-                Color: 'blue',
-                Size: 5,
-                Owner: 'Tomoko',
-                AppraisedValue: 300,
-            },
-            {
-                ID: 'asset2',
-                Color: 'red',
-                Size: 5,
-                Owner: 'Brad',
-                AppraisedValue: 400,
-            },
-            {
-                ID: 'asset3',
-                Color: 'green',
-                Size: 10,
-                Owner: 'Jin Soo',
-                AppraisedValue: 500,
-            },
-            {
-                ID: 'asset4',
-                Color: 'yellow',
-                Size: 10,
-                Owner: 'Max',
-                AppraisedValue: 600,
-            },
-            {
-                ID: 'asset5',
-                Color: 'black',
-                Size: 15,
-                Owner: 'Adriana',
-                AppraisedValue: 700,
-            },
-            {
-                ID: 'asset6',
-                Color: 'white',
-                Size: 15,
-                Owner: 'Michel',
-                AppraisedValue: 800,
-            },
+            new Asset('asset1', 'blue', 5, 'Tomoko', 300),
+            new Asset('asset2', 'red', 5, 'Brad', 400),
+            new Asset('asset3', 'green', 10, 'Jin Soo', 500),
+            new Asset('asset4', 'yellow', 10, 'Max', 600),
+            new Asset('asset5', 'black', 15, 'Adriana', 700),
+            new Asset('asset6', 'white', 15, 'Michel', 800),
         ];
 
         for (const asset of assets) {
-            asset.docType = 'asset';
             await ctx.stub.putState(asset.ID, Buffer.from(JSON.stringify(asset)));
             console.info(`Asset ${asset.ID} initialized`);
         }
@@ -153,5 +113,4 @@ export class AssetTransferContract extends Contract {
         }
         return JSON.stringify(allResults);
     }
-
 }
