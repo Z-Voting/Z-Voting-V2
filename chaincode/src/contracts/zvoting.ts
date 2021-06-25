@@ -10,6 +10,7 @@ export class ZVotingContract extends EntityBasedContract {
     // CreateElection creates a new election
     @Transaction()
     public async CreateElection(ctx: Context, electionId: string, name: string): Promise<void> {
+        this.checkCreateElectionAccess(ctx);
 
         const ownerId = extractSubmittingUserUID(ctx);
         const ownerOrg = extractSubmittingUserOrg(ctx);
@@ -21,29 +22,16 @@ export class ZVotingContract extends EntityBasedContract {
     // AddCandidate adds a candidate to the election
     @Transaction()
     public async AddCandidate(ctx: Context, candidateId: string, name: string, uniqueId: string, electionId: string): Promise<void> {
-        const candidate = new Candidate(candidateId, name, uniqueId, electionId);
-
         const electionJSON = await this.ReadAsset(ctx, electionId);
         const election: Election = JSON.parse(electionJSON);
 
-        const submittingUserUID = extractSubmittingUserUID(ctx);
-        if (election.Owner != submittingUserUID) {
-            throw new Error(`Only the election owner can add a candidate`);
-        }
+        await this.checkAddCandidateAccess(ctx, election, uniqueId);
 
-        if (election.Status == ElectionStatus.RUNNING || election.Status == ElectionStatus.OVER) {
-            throw new Error(`The election with id: ${electionId} is not accepting any more candidates`);
-        }
-
-        const duplicateCandidateExists = await this.duplicateCandidateExists(ctx, uniqueId, electionId);
-        if (duplicateCandidateExists) {
-            throw new Error(`Another candidate with UniqueID: ${uniqueId} already exists for this election`);
-        }
+        const candidate = new Candidate(candidateId, name, uniqueId, electionId);
+        await this.SaveEntity(ctx, candidate);
 
         //TODO: If we have enough judges and enough Candidates, change status to ready
         election.Status = ElectionStatus.READY;
-
-        await this.SaveEntity(ctx, candidate);
         await this.UpdateEntity(ctx, election);
     }
 
@@ -65,20 +53,13 @@ export class ZVotingContract extends EntityBasedContract {
         const electionJSON = await this.ReadEntity(ctx, electionId);
         const election: Election = JSON.parse(electionJSON);
 
-        const submittingUserUID = extractSubmittingUserUID(ctx);
-        if (election.Owner != submittingUserUID) {
-            throw new Error(`Only the election owner can start an election`);
-        }
-
-        if (election.Status != ElectionStatus.READY) {
-            throw new Error(`The election with id: ${electionId} must be in READY state to start, current state is ${election.Status}`);
-        }
+        this.checkStartElectionAccess(ctx, election);
 
         election.Status = ElectionStatus.RUNNING;
         await this.UpdateEntity(ctx, election);
     }
 
-    // CreateAsset issues a new asset to the world state with given details.
+// CreateAsset issues a new asset to the world state with given details.
     @Transaction()
     public async CreateAsset(ctx: Context, id: string, color: string, size: number, owner: string, appraisedValue: number): Promise<void> {
         const asset = {
@@ -168,5 +149,36 @@ export class ZVotingContract extends EntityBasedContract {
             result = await iterator.next();
         }
         return JSON.stringify(allResults);
+    }
+
+    private async checkAddCandidateAccess(ctx: Context, election: Election, uniqueId: string) {
+        const submittingUserUID = extractSubmittingUserUID(ctx);
+        if (election.Owner != submittingUserUID) {
+            throw new Error(`Only the election owner can add a candidate`);
+        }
+
+        if (election.Status == ElectionStatus.RUNNING || election.Status == ElectionStatus.OVER) {
+            throw new Error(`The election with id: ${election.ID} is not accepting any more candidates`);
+        }
+
+        const duplicateCandidateExists = await this.duplicateCandidateExists(ctx, uniqueId, election.ID);
+        if (duplicateCandidateExists) {
+            throw new Error(`Another candidate with UniqueID: ${uniqueId} already exists for this election`);
+        }
+    }
+
+    private checkCreateElectionAccess(ctx: Context) {
+
+    }
+
+    private checkStartElectionAccess(ctx: Context, election: Election) {
+        const submittingUserUID = extractSubmittingUserUID(ctx);
+        if (election.Owner != submittingUserUID) {
+            throw new Error(`Only the election owner can start an election`);
+        }
+
+        if (election.Status != ElectionStatus.READY) {
+            throw new Error(`The election with id: ${election.ID} must be in READY state to start, current state is ${election.Status}`);
+        }
     }
 }
