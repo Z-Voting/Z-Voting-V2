@@ -1,7 +1,8 @@
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
 import {EntityBasedContract} from "./entityBasedContract";
-import {Candidate, Election, ElectionStatus} from "../types/election";
+import {Election, ElectionStatus} from "../types/election";
 import {extractSubmittingUserOrg, extractSubmittingUserUID} from "../helper/contractHelper";
+import {Candidate} from "../types/candidate";
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
 export class ZVotingContract extends EntityBasedContract {
