@@ -29,7 +29,10 @@ async function main() {
 
         // in a real application this would be done only when a new user was required to be added
         // and would be part of an administrative flow
-        await registerAndEnrollUser(caClient, wallet, mspOrg1, org1UserId, 'org1.department1');
+        await registerAndEnrollUser(caClient, wallet, mspOrg1, org1UserId, 'org1.department1', [
+            {name: 'election.judge', value: 'true', ecert: true},
+            {name: 'election.creator', value: 'true', ecert: true},
+        ]);
 
         // Create a new gateway instance for interacting with the fabric network.
         // In a real application this would be done as the backend server session is setup for
@@ -87,7 +90,7 @@ async function main() {
                 const n = key.keyPair.n.toString();
                 const e = key.keyPair.e.toString();
 
-                const rounds = 1000;
+                const rounds = 1;
                 console.log(`Start verifying ${rounds} signatures`);
                 for (let i = 0; i < rounds; i++) {
                     const message = "The quick brown fox jumps over a lazy dog";

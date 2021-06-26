@@ -76,7 +76,9 @@ export class ZVotingContract extends EntityBasedContract {
     }
 
     private checkCreateElectionAccess(ctx: Context) {
-
+        if (!ctx.clientIdentity.assertAttributeValue("election.creator", "true")) {
+            throw new Error(`You must have election creator role to create an election`);
+        }
     }
 
     private checkStartElectionAccess(ctx: Context, election: Election) {

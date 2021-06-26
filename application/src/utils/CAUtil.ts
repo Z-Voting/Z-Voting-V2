@@ -6,6 +6,7 @@
 
 import * as FabricCAServices from 'fabric-ca-client';
 import { Wallet } from 'fabric-network';
+import {IKeyValueAttribute} from "fabric-ca-client";
 
 const adminUserId = 'admin';
 const adminUserPasswd = 'adminpw';
@@ -50,7 +51,7 @@ const enrollAdmin = async (caClient: FabricCAServices, wallet: Wallet, orgMspId:
     }
 };
 
-const registerAndEnrollUser = async (caClient: FabricCAServices, wallet: Wallet, orgMspId: string, userId: string, affiliation: string): Promise<void> => {
+const registerAndEnrollUser = async (caClient: FabricCAServices, wallet: Wallet, orgMspId: string, userId: string, affiliation: string, attrs: IKeyValueAttribute[] = []): Promise<void> => {
     try {
         // Check to see if we've already enrolled the user
         const userIdentity = await wallet.get(userId);
@@ -77,6 +78,7 @@ const registerAndEnrollUser = async (caClient: FabricCAServices, wallet: Wallet,
             affiliation,
             enrollmentID: userId,
             role: 'client',
+            attrs: attrs,
         }, adminUser);
         const enrollment = await caClient.enroll({
             enrollmentID: userId,
