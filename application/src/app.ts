@@ -1,3 +1,6 @@
+const BlindSignature = require('blind-signatures');
+const NodeRSA = require('node-rsa');
+
 import {Gateway, GatewayOptions} from 'fabric-network';
 import * as path from 'path';
 import {buildCCPOrg1, buildWallet} from './utils/AppUtil';
@@ -68,6 +71,74 @@ async function main() {
                 console.log('\n--> Submit Transaction: StartElection');
                 await contract.submitTransaction('StartElection', `election${electionId}`);
                 console.log('*** Result: election started');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // Judge is Added
+            try {
+                const key = BlindSignature.keyGeneration({b: 2048});
+
+                const privateKey = key.exportKey('pkcs8').toString();
+                console.log("\n");
+                console.log(privateKey);
+                console.log("\n");
+
+                const n = key.keyPair.n.toString();
+                const e = key.keyPair.e.toString();
+
+                const rounds = 1000;
+                console.log(`Start verifying ${rounds} signatures`);
+                for (let i = 0; i < rounds; i++) {
+                    const message = "The quick brown fox jumps over a lazy dog";
+                    const {blinded, r} = BlindSignature.blind({
+                        message: message,
+                        N: n,
+                        E: e,
+                    }); // Alice blinds message
+
+                    const signed = BlindSignature.sign({
+                        blinded: blinded,
+                        key: key
+                    });
+
+                    const unblinded = BlindSignature.unblind({
+                        signed: signed,
+                        N: n,
+                        r: r
+                    });
+
+                    // console.log("\n\n------------------------");
+                    // console.log(unblinded.toString());
+                    // console.log("------------------------\n\n");
+
+
+                    const result = BlindSignature.verify({
+                        unblinded: unblinded.toString(),
+                        N: n,
+                        E: e,
+                        message: message,
+                    });
+                    // if (result) {
+                    //     console.log('Alice: Signatures verify!');
+                    // } else {
+                    //     console.log('Alice: Invalid signature');
+                    // }
+
+                    const result2 = BlindSignature.verify2({
+                        unblinded: unblinded.toString(),
+                        key: key,
+                        message: message,
+                    });
+                    // if (result2) {
+                    //     console.log('Bob: Signatures verify!');
+                    // } else {
+                    //     console.log('Bob: Invalid signature');
+                    // }
+                }
+                console.log("End verifying 10000 signatures");
+
+
             } catch (e) {
                 console.error(e.toString());
             }
