@@ -3,6 +3,7 @@ import {EntityBasedContract} from "./entityBasedContract";
 import {Election, ElectionStatus} from "../types/election";
 import {extractSubmittingUserOrg, extractSubmittingUserUID} from "../helper/contractHelper";
 import {Candidate} from "../types/candidate";
+import {JudgeProposal} from "../types/judgeProposal";
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
 export class ZVotingContract extends EntityBasedContract {
@@ -10,7 +11,7 @@ export class ZVotingContract extends EntityBasedContract {
     // CreateElection creates a new election
     @Transaction()
     public async CreateElection(ctx: Context, electionId: string, name: string): Promise<void> {
-        this.checkCreateElectionAccess(ctx);
+        await this.checkCreateElectionAccess(ctx, electionId);
 
         const ownerId = extractSubmittingUserUID(ctx);
         const ownerOrg = extractSubmittingUserOrg(ctx);
@@ -30,8 +31,7 @@ export class ZVotingContract extends EntityBasedContract {
         const candidate = new Candidate(candidateId, name, uniqueId, electionId);
         await this.SaveEntity(ctx, candidate);
 
-        //TODO: If we have enough judges and enough Candidates, change status to ready
-        election.Status = ElectionStatus.READY;
+        this.refreshElectionStatus(election);
         await this.UpdateEntity(ctx, election);
     }
 
@@ -47,19 +47,47 @@ export class ZVotingContract extends EntityBasedContract {
         return await this.QueryResultExists(ctx, JSON.stringify(query));
     }
 
+    // AddCandidate adds a candidate to the election
+    @Transaction()
+    public async AddJudgeProposal(ctx: Context, n: string, e: string, electionId: string): Promise<void> {
+        const electionJSON = await this.ReadEntity(ctx, electionId);
+        const election: Election = JSON.parse(electionJSON);
+
+        await this.checkAddJudgeProposalAccess(ctx, election);
+
+        const judgeProposal = new JudgeProposal(extractSubmittingUserOrg(ctx), n, e, electionId);
+        await this.SaveEntity(ctx, judgeProposal);
+
+        if (ctx.clientIdentity.getMSPID() === ctx.stub.getMspID()) {
+            let privateKey = ctx.stub.getTransient().get('privateKey')!.toString();
+            let privateKeyId = `judgePrivateKey_${election.ID}_${extractSubmittingUserOrg(ctx)}`
+
+            await this.saveImplicitPrivateData(ctx, privateKeyId, privateKey);
+        }
+    }
+
     // StartElection starts an election if it is ready
     @Transaction()
     public async StartElection(ctx: Context, electionId: string): Promise<void> {
         const electionJSON = await this.ReadEntity(ctx, electionId);
         const election: Election = JSON.parse(electionJSON);
 
-        this.checkStartElectionAccess(ctx, election);
+        ZVotingContract.checkStartElectionAccess(ctx, election);
 
         election.Status = ElectionStatus.RUNNING;
         await this.UpdateEntity(ctx, election);
     }
 
+    private refreshElectionStatus(election: Election) {
+        //TODO: If we have enough judges and enough Candidates, change status to ready
+        election.Status = ElectionStatus.READY;
+    }
+
     private async checkAddCandidateAccess(ctx: Context, election: Election, uniqueId: string) {
+        if (!ctx.clientIdentity.assertAttributeValue("election.creator", "true")) {
+            throw new Error(`You must have election creator role to add candidate to an election`);
+        }
+
         const submittingUserUID = extractSubmittingUserUID(ctx);
         if (election.Owner != submittingUserUID) {
             throw new Error(`Only the election owner can add a candidate`);
@@ -75,13 +103,21 @@ export class ZVotingContract extends EntityBasedContract {
         }
     }
 
-    private checkCreateElectionAccess(ctx: Context) {
+    private async checkCreateElectionAccess(ctx: Context, electionId: string) {
         if (!ctx.clientIdentity.assertAttributeValue("election.creator", "true")) {
             throw new Error(`You must have election creator role to create an election`);
         }
+
+        if (await this.EntityExists(ctx, electionId)) {
+            throw new Error(`Election with id: ${electionId} already exists`);
+        }
     }
 
-    private checkStartElectionAccess(ctx: Context, election: Election) {
+    private static checkStartElectionAccess(ctx: Context, election: Election) {
+        if (!ctx.clientIdentity.assertAttributeValue("election.creator", "true")) {
+            throw new Error(`You must have election creator role to start an election`);
+        }
+
         const submittingUserUID = extractSubmittingUserUID(ctx);
         if (election.Owner != submittingUserUID) {
             throw new Error(`Only the election owner can start an election`);
@@ -89,6 +125,33 @@ export class ZVotingContract extends EntityBasedContract {
 
         if (election.Status != ElectionStatus.READY) {
             throw new Error(`The election with id: ${election.ID} must be in READY state to start, current state is ${election.Status}`);
+        }
+    }
+
+    private async checkAddJudgeProposalAccess(ctx: Context, election: Election) {
+        //TODO: Add additional checks (private key public key matching etc.)
+        if (ctx.stub.getMspID() == ctx.clientIdentity.getMSPID()) {
+            if (ctx.stub.getTransient().get('privateKey') == null) {
+                throw new Error('You must have valid private key to become a judge');
+            }
+        }
+
+        const judgeProposalId = `judgeProposal_${election.ID}_${extractSubmittingUserOrg(ctx)}`;
+        if (await this.EntityExists(ctx, judgeProposalId)) {
+            throw new Error(`Your organization has already sent a judge proposal in the election with id: ${election.ID}`);
+        }
+
+        const judgeId = `judge_${election.ID}_${extractSubmittingUserOrg(ctx)}`;
+        if (await this.EntityExists(ctx, judgeId)) {
+            throw new Error(`Your organization is already a judge in the election with id: ${election.ID}`);
+        }
+
+        if (!ctx.clientIdentity.assertAttributeValue("election.judge", "true")) {
+            throw new Error(`You must have election judge role to make your organization a judge of this election`);
+        }
+
+        if (election.Status != ElectionStatus.PENDING && election.Status != ElectionStatus.READY) {
+            throw new Error(`The election with id: ${election.ID} is not accepting any more judge proposals`);
         }
     }
 }

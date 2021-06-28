@@ -1,8 +1,23 @@
 import {Context, Contract, Returns, Transaction} from "fabric-contract-api";
 import {Entity} from "../types/entity";
 import {Iterators} from "fabric-shim-api";
+import { KeyEndorsementPolicy } from 'fabric-shim';
 
 export class EntityBasedContract extends Contract {
+
+    public getImplicitPrivateCollection(ctx: Context) {
+        return '_implicit_org_' + ctx.stub.getMspID();
+    }
+
+    @Transaction()
+    public async GetPrivateEndorsementRight(ctx: Context, key: string) {
+        let implicitPrivateCollection = '_implicit_org_' + ctx.clientIdentity.getMSPID();
+
+        const ep = new KeyEndorsementPolicy();
+        ep.addOrgs('PEER', ctx.clientIdentity.getMSPID());
+
+        await ctx.stub.setPrivateDataValidationParameter(implicitPrivateCollection, key, ep.getPolicy());
+    }
 
     // ReadEntity returns the entity stored in the world state with given id.
     @Transaction(false)
@@ -13,6 +28,37 @@ export class EntityBasedContract extends Contract {
             throw new Error(`The entity with id: ${id} does not exist`);
         }
         return entityJSON.toString();
+    }
+
+    // savePrivateData saves a private data to the given collection
+    protected async savePrivateData(ctx: Context, collection: string, id: string, data: string) {
+
+        console.log('/-----------------------------------');
+        console.log(collection);
+        console.log(id);
+        console.log((await ctx.stub.getPrivateDataValidationParameter(collection, id)));
+        // console.log(data);
+        console.log('/-----------------------------------');
+
+
+
+        await ctx.stub.putPrivateData(collection, id, Buffer.from(data));
+    }
+
+    // savePrivateData saves a private data to the given collection
+    protected async saveImplicitPrivateData(ctx: Context, id: string, data: string) {
+        let implicitPrivateCollection = this.getImplicitPrivateCollection(ctx);
+
+        const ep = new KeyEndorsementPolicy();
+        ep.addOrgs('MEMBER', ctx.stub.getMspID());
+
+        console.log("----^^^^-----")
+        console.log(ep.listOrgs());
+        console.log(ep.getPolicy().toString());
+        console.log("----^^^^-----")
+        await ctx.stub.setPrivateDataValidationParameter(implicitPrivateCollection, id, ep.getPolicy());
+
+        await this.savePrivateData(ctx, implicitPrivateCollection, id, data);
     }
 
     // SaveEntity saves a new entity in the world state
