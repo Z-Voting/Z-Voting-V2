@@ -166,9 +166,17 @@ async function main() {
                 console.error(e.toString());
             }
 
+            try {
+                console.log('\n--> Evaluate Transaction: DuplicateCandidateExists');
+                const result = await contract.evaluateTransaction('DuplicateCandidateExists', 'PartyBCandidateB', `${electionId}`);
+                console.log(`*** Result: ${result}`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
             // Get Elections
             try {
-                console.log('\n--> Submit Transaction: GetElections');
+                console.log('\n--> Evaluate Transaction: GetElections');
                 const result = await contract.evaluateTransaction('GetElections');
                 console.log(`*** Result: ${result}`);
             } catch (e) {
@@ -177,7 +185,7 @@ async function main() {
 
             // Get Election Candidates
             try {
-                console.log('\n--> Submit Transaction: GetCandidates');
+                console.log('\n--> Evaluate Transaction: GetCandidates');
                 const result = await contract.evaluateTransaction('GetCandidates', `${electionId}`);
                 console.log(`*** Result: ${result}`);
             } catch (e) {
