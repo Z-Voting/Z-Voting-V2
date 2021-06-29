@@ -63,85 +63,96 @@ async function main() {
             // Create election
             try {
                 console.log('\n--> Submit Transaction: CreateElection');
-                await contract.submitTransaction('CreateElection', `election${electionId}`, `election ${electionId}`);
+                await contract.submitTransaction('CreateElection', `${electionId}`, `election ${electionId}`);
                 console.log('*** Result: election created');
             } catch (e) {
                 console.error(e.toString());
             }
 
-            // This will fail as election is not ready
+            // Get Private Endorsement Right
             try {
-                console.log('\n--> Submit Transaction: StartElection');
-                await contract.submitTransaction('StartElection', `election${electionId}`);
-                console.log('*** Result: election started');
+                console.log('\n--> Submit Transaction: GetPrivateEndorsementRight');
+                await contract.submitTransaction('GetPrivateEndorsementRight', `privateData`);
+                console.log('*** Result: GetPrivateEndorsementRight succeeded');
             } catch (e) {
                 console.error(e.toString());
             }
 
-            // Judge is Added
+
+
+            // // Judge is Added
+            // try {
+            //     const key = BlindSignature.keyGeneration({b: 2048});
+            //
+            //     const privateKey = key.exportKey('pkcs8').toString();
+            //     console.log("\n");
+            //     console.log(privateKey);
+            //     console.log("\n");
+            //
+            //     const n = key.keyPair.n.toString();
+            //     const e = key.keyPair.e.toString();
+            //
+            //     const rounds = 1;
+            //     console.log(`Start verifying ${rounds} signatures`);
+            //     for (let i = 0; i < rounds; i++) {
+            //         const message = "The quick brown fox jumps over a lazy dog";
+            //         const {blinded, r} = BlindSignature.blind({
+            //             message: message,
+            //             N: n,
+            //             E: e,
+            //         }); // Alice blinds message
+            //
+            //         const signed = BlindSignature.sign({
+            //             blinded: blinded,
+            //             key: key
+            //         });
+            //
+            //         const unblinded = BlindSignature.unblind({
+            //             signed: signed,
+            //             N: n,
+            //             r: r
+            //         });
+            //
+            //         // console.log("\n\n------------------------");
+            //         // console.log(unblinded.toString());
+            //         // console.log("------------------------\n\n");
+            //
+            //
+            //         const result = BlindSignature.verify({
+            //             unblinded: unblinded.toString(),
+            //             N: n,
+            //             E: e,
+            //             message: message,
+            //         });
+            //         // if (result) {
+            //         //     console.log('Alice: Signatures verify!');
+            //         // } else {
+            //         //     console.log('Alice: Invalid signature');
+            //         // }
+            //
+            //         const result2 = BlindSignature.verify2({
+            //             unblinded: unblinded.toString(),
+            //             key: key,
+            //             message: message,
+            //         });
+            //         // if (result2) {
+            //         //     console.log('Bob: Signatures verify!');
+            //         // } else {
+            //         //     console.log('Bob: Invalid signature');
+            //         // }
+            //     }
+            //     console.log("End verifying 10000 signatures");
+            //
+            //
+            // } catch (e) {
+            //     console.error(e.toString());
+            // }
+
+            // One candidate is added
             try {
-                const key = BlindSignature.keyGeneration({b: 2048});
-
-                const privateKey = key.exportKey('pkcs8').toString();
-                console.log("\n");
-                console.log(privateKey);
-                console.log("\n");
-
-                const n = key.keyPair.n.toString();
-                const e = key.keyPair.e.toString();
-
-                const rounds = 1;
-                console.log(`Start verifying ${rounds} signatures`);
-                for (let i = 0; i < rounds; i++) {
-                    const message = "The quick brown fox jumps over a lazy dog";
-                    const {blinded, r} = BlindSignature.blind({
-                        message: message,
-                        N: n,
-                        E: e,
-                    }); // Alice blinds message
-
-                    const signed = BlindSignature.sign({
-                        blinded: blinded,
-                        key: key
-                    });
-
-                    const unblinded = BlindSignature.unblind({
-                        signed: signed,
-                        N: n,
-                        r: r
-                    });
-
-                    // console.log("\n\n------------------------");
-                    // console.log(unblinded.toString());
-                    // console.log("------------------------\n\n");
-
-
-                    const result = BlindSignature.verify({
-                        unblinded: unblinded.toString(),
-                        N: n,
-                        E: e,
-                        message: message,
-                    });
-                    // if (result) {
-                    //     console.log('Alice: Signatures verify!');
-                    // } else {
-                    //     console.log('Alice: Invalid signature');
-                    // }
-
-                    const result2 = BlindSignature.verify2({
-                        unblinded: unblinded.toString(),
-                        key: key,
-                        message: message,
-                    });
-                    // if (result2) {
-                    //     console.log('Bob: Signatures verify!');
-                    // } else {
-                    //     console.log('Bob: Invalid signature');
-                    // }
-                }
-                console.log("End verifying 10000 signatures");
-
-
+                console.log('\n--> Submit Transaction: AddCandidate');
+                await contract.submitTransaction('AddCandidate', 'Candidate A', 'PartyACandidateA', `election${electionId}`);
+                console.log('*** Result: Candidate Added');
             } catch (e) {
                 console.error(e.toString());
             }
@@ -149,17 +160,26 @@ async function main() {
             // One candidate is added
             try {
                 console.log('\n--> Submit Transaction: AddCandidate');
-                await contract.submitTransaction('AddCandidate', `candidateA_partyA_election${electionId}`, 'Candidate A', 'PartyACandidateA', `election${electionId}`);
+                await contract.submitTransaction('AddCandidate', 'Candidate B', 'PartyBCandidateB', `${electionId}`);
                 console.log('*** Result: Candidate Added');
             } catch (e) {
                 console.error(e.toString());
             }
 
-            // This fails as same candidate is added again
+            // Get Elections
             try {
-                console.log('\n--> Submit Transaction: AddCandidate');
-                await contract.submitTransaction('AddCandidate', `candidateA_partyA_election${electionId}`, 'Candidate A', 'PartyACandidateA', `election${electionId}`);
-                console.log('*** Result: Candidate Added');
+                console.log('\n--> Submit Transaction: GetElections');
+                const result = await contract.evaluateTransaction('GetElections');
+                console.log(`*** Result: ${result}`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // Get Election Candidates
+            try {
+                console.log('\n--> Submit Transaction: GetCandidates');
+                const result = await contract.evaluateTransaction('GetCandidates', `${electionId}`);
+                console.log(`*** Result: ${result}`);
             } catch (e) {
                 console.error(e.toString());
             }
