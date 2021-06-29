@@ -1,17 +1,17 @@
-import {Context} from "fabric-contract-api";
+import {Context} from 'fabric-contract-api';
 
 export function decodeBase64(s: string) {
     const buffer = new Buffer(s, 'base64');
     return buffer.toString('utf8');
 }
 
-export function extractSubmittingUserOrg(ctx: Context) {
+export function getSubmittingUserOrg(ctx: Context) {
     return ctx.clientIdentity.getMSPID();
 }
 
-export function extractSubmittingUserUID(ctx: Context) {
-    let userId = ctx.clientIdentity.getID();
-    let mspId = ctx.clientIdentity.getMSPID();
+export function getSubmittingUserUID(ctx: Context) {
+    const userId = ctx.clientIdentity.getID();
+    const mspId = ctx.clientIdentity.getMSPID();
 
     return `${userId}@${mspId}`;
 }

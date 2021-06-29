@@ -1,7 +1,7 @@
-import {Context, Contract, Returns, Transaction} from "fabric-contract-api";
-import {Entity} from "../types/entity";
-import {Iterators} from "fabric-shim-api";
+import {Context, Contract, Returns, Transaction} from 'fabric-contract-api';
 import { KeyEndorsementPolicy } from 'fabric-shim';
+import {Iterators} from 'fabric-shim-api';
+import {Entity} from '../types/entity';
 
 export class EntityBasedContract extends Contract {
 
@@ -11,7 +11,7 @@ export class EntityBasedContract extends Contract {
 
     @Transaction()
     public async GetPrivateEndorsementRight(ctx: Context, key: string) {
-        let implicitPrivateCollection = '_implicit_org_' + ctx.clientIdentity.getMSPID();
+        const implicitPrivateCollection = '_implicit_org_' + ctx.clientIdentity.getMSPID();
 
         const ep = new KeyEndorsementPolicy();
         ep.addOrgs('PEER', ctx.clientIdentity.getMSPID());
@@ -28,37 +28,6 @@ export class EntityBasedContract extends Contract {
             throw new Error(`The entity with id: ${id} does not exist`);
         }
         return entityJSON.toString();
-    }
-
-    // savePrivateData saves a private data to the given collection
-    protected async savePrivateData(ctx: Context, collection: string, id: string, data: string) {
-
-        console.log('/-----------------------------------');
-        console.log(collection);
-        console.log(id);
-        console.log((await ctx.stub.getPrivateDataValidationParameter(collection, id)));
-        // console.log(data);
-        console.log('/-----------------------------------');
-
-
-
-        await ctx.stub.putPrivateData(collection, id, Buffer.from(data));
-    }
-
-    // savePrivateData saves a private data to the given collection
-    protected async saveImplicitPrivateData(ctx: Context, id: string, data: string) {
-        let implicitPrivateCollection = this.getImplicitPrivateCollection(ctx);
-
-        const ep = new KeyEndorsementPolicy();
-        ep.addOrgs('MEMBER', ctx.stub.getMspID());
-
-        console.log("----^^^^-----")
-        console.log(ep.listOrgs());
-        console.log(ep.getPolicy().toString());
-        console.log("----^^^^-----")
-        await ctx.stub.setPrivateDataValidationParameter(implicitPrivateCollection, id, ep.getPolicy());
-
-        await this.savePrivateData(ctx, implicitPrivateCollection, id, data);
     }
 
     // SaveEntity saves a new entity in the world state
@@ -137,37 +106,37 @@ export class EntityBasedContract extends Contract {
     }
 
     public async QueryResultExists(ctx: Context, queryString: string) {
-        let resultsIterator = await ctx.stub.getQueryResult(queryString);
-        let firstRecord = await resultsIterator.next();
+        const resultsIterator = await ctx.stub.getQueryResult(queryString);
+        const firstRecord = await resultsIterator.next();
 
         return !firstRecord.done;
     }
 
     // GetQueryResultForQueryString executes the passed in query string.
     // Result set is built and returned as a byte array containing the JSON results.
-    async GetQueryResultForQueryString(ctx: Context, queryString: string) {
+    public async GetQueryResultForQueryString(ctx: Context, queryString: string) {
 
-        let resultsIterator = await ctx.stub.getQueryResult(queryString);
-        let results = await this.GetAllQueryResults(resultsIterator);
+        const resultsIterator = await ctx.stub.getQueryResult(queryString);
+        const results = await this.GetAllQueryResults(resultsIterator);
 
         return JSON.stringify(results);
     }
 
     // GetAssetHistory returns the chain of custody for an asset since issuance.
-    async GetHistory(ctx: Context, ID: string) {
+    public async GetHistory(ctx: Context, ID: string) {
 
-        let resultsIterator = await ctx.stub.getHistoryForKey(ID);
-        let results = await this.GetAllHistoryResults(resultsIterator);
+        const resultsIterator = await ctx.stub.getHistoryForKey(ID);
+        const results = await this.GetAllHistoryResults(resultsIterator);
 
         return JSON.stringify(results);
     }
 
     public async GetAllQueryResults(iterator: Iterators.StateQueryIterator) {
-        let allResults = [];
+        const allResults = [];
         let res = await iterator.next();
         while (!res.done) {
             if (res.value && res.value.value.toString()) {
-                let jsonRes: any = {};
+                const jsonRes: any = {};
                 console.log(res.value.value.toString());
 
                 jsonRes.Key = res.value.key;
@@ -187,11 +156,11 @@ export class EntityBasedContract extends Contract {
     }
 
     public async GetAllHistoryResults(iterator: Iterators.HistoryQueryIterator) {
-        let allResults = [];
+        const allResults = [];
         let res = await iterator.next();
         while (!res.done) {
             if (res.value && res.value.value.toString()) {
-                let jsonRes: any = {};
+                const jsonRes: any = {};
                 console.log(res.value.value.toString());
 
                 jsonRes.TxId = res.value.txId;
@@ -209,5 +178,34 @@ export class EntityBasedContract extends Contract {
         }
         await iterator.close();
         return allResults;
+    }
+
+    // savePrivateData saves a private data to the given collection
+    protected async savePrivateData(ctx: Context, collection: string, id: string, data: string) {
+
+        console.log('/-----------------------------------');
+        console.log(collection);
+        console.log(id);
+        console.log((await ctx.stub.getPrivateDataValidationParameter(collection, id)));
+        // console.log(data);
+        console.log('/-----------------------------------');
+
+        await ctx.stub.putPrivateData(collection, id, Buffer.from(data));
+    }
+
+    // savePrivateData saves a private data to the given collection
+    protected async saveImplicitPrivateData(ctx: Context, id: string, data: string) {
+        const implicitPrivateCollection = this.getImplicitPrivateCollection(ctx);
+
+        const ep = new KeyEndorsementPolicy();
+        ep.addOrgs('MEMBER', ctx.stub.getMspID());
+
+        console.log('----^^^^-----');
+        console.log(ep.listOrgs());
+        console.log(ep.getPolicy().toString());
+        console.log('----^^^^-----');
+        await ctx.stub.setPrivateDataValidationParameter(implicitPrivateCollection, id, ep.getPolicy());
+
+        await this.savePrivateData(ctx, implicitPrivateCollection, id, data);
     }
 }

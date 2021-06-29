@@ -78,8 +78,6 @@ async function main() {
                 console.error(e.toString());
             }
 
-
-
             // // Judge is Added
             // try {
             //     const key = BlindSignature.keyGeneration({b: 2048});
@@ -212,5 +210,5 @@ async function main() {
 }
 
 main()
-    .then(() => console.log("Successfully executed app"))
-    .catch(reason => console.error(`Error: ${reason.toString()}`));
+    .then(() => console.log('Successfully executed app'))
+    .catch((reason) => console.error(`Error: ${reason.toString()}`));

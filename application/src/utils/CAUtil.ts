@@ -1,12 +1,6 @@
-/*
- * Copyright IBM Corp. All Rights Reserved.
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import * as FabricCAServices from 'fabric-ca-client';
+import {IKeyValueAttribute} from 'fabric-ca-client';
 import { Wallet } from 'fabric-network';
-import {IKeyValueAttribute} from "fabric-ca-client";
 
 const adminUserId = 'admin';
 const adminUserPasswd = 'adminpw';
@@ -78,7 +72,7 @@ const registerAndEnrollUser = async (caClient: FabricCAServices, wallet: Wallet,
             affiliation,
             enrollmentID: userId,
             role: 'client',
-            attrs: attrs,
+            attrs,
         }, adminUser);
         const enrollment = await caClient.enroll({
             enrollmentID: userId,
