@@ -1,5 +1,5 @@
 import {Context, Contract, Returns, Transaction} from 'fabric-contract-api';
-import { KeyEndorsementPolicy } from 'fabric-shim';
+import {KeyEndorsementPolicy} from 'fabric-shim';
 import {Iterators} from 'fabric-shim-api';
 import {Entity} from '../types/entity';
 
@@ -101,8 +101,8 @@ export class EntityBasedContract extends Contract {
         return JSON.stringify(allResults);
     }
 
-    public async QueryLedger(ctx: Context, queryString: string) {
-        return await this.GetQueryResultForQueryString(ctx, queryString);
+    public async QueryLedger(ctx: Context, queryString: string, wideOutput: boolean = false) {
+        return await this.GetQueryResultForQueryString(ctx, queryString, wideOutput);
     }
 
     public async QueryResultExists(ctx: Context, queryString: string) {
@@ -114,10 +114,10 @@ export class EntityBasedContract extends Contract {
 
     // GetQueryResultForQueryString executes the passed in query string.
     // Result set is built and returned as a byte array containing the JSON results.
-    public async GetQueryResultForQueryString(ctx: Context, queryString: string) {
+    public async GetQueryResultForQueryString(ctx: Context, queryString: string, wideOutput: boolean = false ) {
 
         const resultsIterator = await ctx.stub.getQueryResult(queryString);
-        const results = await this.GetAllQueryResults(resultsIterator);
+        const results = await this.GetAllQueryResults(resultsIterator, wideOutput);
 
         return JSON.stringify(results);
     }
@@ -131,20 +131,30 @@ export class EntityBasedContract extends Contract {
         return JSON.stringify(results);
     }
 
-    public async GetAllQueryResults(iterator: Iterators.StateQueryIterator) {
+    public async GetAllQueryResults(iterator: Iterators.StateQueryIterator, wideOutput: boolean = false) {
         const allResults = [];
         let res = await iterator.next();
         while (!res.done) {
             if (res.value && res.value.value.toString()) {
-                const jsonRes: any = {};
-                console.log(res.value.value.toString());
+                let jsonRes: any = {};
 
-                jsonRes.Key = res.value.key;
-                try {
-                    jsonRes.Record = JSON.parse(res.value.value.toString());
-                } catch (err) {
-                    console.log(err);
-                    jsonRes.Record = res.value.value.toString();
+                if (wideOutput) {
+                    console.log(res.value.value.toString());
+
+                    jsonRes.Key = res.value.key;
+                    try {
+                        jsonRes.Record = JSON.parse(res.value.value.toString());
+                    } catch (err) {
+                        console.log(err);
+                        jsonRes.Record = res.value.value.toString();
+                    }
+                } else {
+                    try {
+                        jsonRes = JSON.parse(res.value.value.toString());
+                    } catch (err) {
+                        console.log(err);
+                        jsonRes = res.value.value.toString();
+                    }
                 }
 
                 allResults.push(jsonRes);
