@@ -182,30 +182,12 @@ export class EntityBasedContract extends Contract {
 
     // savePrivateData saves a private data to the given collection
     protected async savePrivateData(ctx: Context, collection: string, id: string, data: string) {
-
-        console.log('/-----------------------------------');
-        console.log(collection);
-        console.log(id);
-        console.log((await ctx.stub.getPrivateDataValidationParameter(collection, id)));
-        // console.log(data);
-        console.log('/-----------------------------------');
-
         await ctx.stub.putPrivateData(collection, id, Buffer.from(data));
     }
 
     // savePrivateData saves a private data to the given collection
     protected async saveImplicitPrivateData(ctx: Context, id: string, data: string) {
         const implicitPrivateCollection = this.getImplicitPrivateCollection(ctx);
-
-        const ep = new KeyEndorsementPolicy();
-        ep.addOrgs('MEMBER', ctx.stub.getMspID());
-
-        console.log('----^^^^-----');
-        console.log(ep.listOrgs());
-        console.log(ep.getPolicy().toString());
-        console.log('----^^^^-----');
-        await ctx.stub.setPrivateDataValidationParameter(implicitPrivateCollection, id, ep.getPolicy());
-
         await this.savePrivateData(ctx, implicitPrivateCollection, id, data);
     }
 }
