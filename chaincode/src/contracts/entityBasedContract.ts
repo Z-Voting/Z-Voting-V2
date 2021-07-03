@@ -5,8 +5,12 @@ import {Entity} from '../types/entity';
 
 export class EntityBasedContract extends Contract {
 
-    public getImplicitPrivateCollection(ctx: Context) {
-        return '_implicit_org_' + ctx.stub.getMspID();
+    public getImplicitPrivateCollection(ctx: Context, org?: string) {
+        if (org === undefined) {
+            return '_implicit_org_' + ctx.stub.getMspID();
+        } else {
+            return '_implicit_org_' + org;
+        }
     }
 
     // TODO: ADD ACCESS CHECKING LATER
@@ -34,7 +38,7 @@ export class EntityBasedContract extends Contract {
         if (ctx.clientIdentity.getMSPID() === ctx.stub.getMspID()) {
             const data = ctx.stub.getTransient().get('data');
 
-            if (data === null) {
+            if (data === undefined) {
                 throw new Error(`Transient Data not given`);
             } else {
                 await this.saveImplicitPrivateData(ctx, key, data!);
@@ -66,10 +70,10 @@ export class EntityBasedContract extends Contract {
     public async SaveEntity(ctx: Context, entity: Entity): Promise<void> {
         const id = entity.ID;
 
-        const exists = await this.EntityExists(ctx, id);
-        if (exists) {
-            throw new Error(`The entity with id: ${id} already exists`);
-        }
+        // const exists = await this.EntityExists(ctx, id);
+        // if (exists) {
+        //     throw new Error(`The entity with id: ${id} already exists`);
+        // }
 
         return ctx.stub.putState(id, Buffer.from(JSON.stringify(entity)));
     }

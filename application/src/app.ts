@@ -82,6 +82,8 @@ async function main() {
                 const n = key.keyPair.n.toString();
                 const e = key.keyPair.e.toString();
 
+                console.log(key.keyPair);
+
                 const collectionKey = `privateKey_${mspOrg1}`;
 
                 // Get Private Endorsement Right
@@ -110,7 +112,7 @@ async function main() {
 
                 // Fetch Private Key
                 try {
-                    console.log('\n--> Submit Transaction: GetImplicitPrivateData');
+                    console.log('\n--> Evaluate Transaction: GetImplicitPrivateData');
                     const result = await contract.evaluateTransaction('GetImplicitPrivateData', collectionKey);
                     console.log(`*** Result: ${result}`);
                 } catch (e) {
@@ -120,6 +122,10 @@ async function main() {
                 console.log('\n--> Submit Transaction: PublishIdentity');
                 await contract.submitTransaction('PublishIdentity', n, e);
                 console.log('*** Result: Identity Published');
+
+                console.log('\n--> Evaluate Transaction: FetchIdentity');
+                const result = await contract.evaluateTransaction('FetchIdentity', mspOrg1);
+                console.log(`*** Result: ${result}`);
 
             } catch (e) {
                 console.error(e.toString());

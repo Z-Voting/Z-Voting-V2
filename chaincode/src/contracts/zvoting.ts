@@ -1,3 +1,5 @@
+const NodeRSA = require('node-rsa');
+const BigInteger = require('jsbn').BigInteger;
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
 import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
 import {formatElectionId} from '../helper/zVotingContractHelper';
@@ -12,10 +14,15 @@ export class ZVotingContract extends EntityBasedContract {
 
     @Transaction()
     public async PublishIdentity(ctx: Context, n: string, e: string) {
-        await ZVotingContract.checkPublishIdentityAccess(ctx);
+        await this.checkPublishIdentityAccess(ctx, n, e);
 
         const identity = new Identity(getSubmittingUserOrg(ctx), n, e);
         await this.SaveEntity(ctx, identity);
+    }
+
+    @Transaction(false)
+    public async FetchIdentity(ctx: Context, org: string) {
+        return (await ctx.stub.getState(`identity_${org}`)).toString();
     }
 
     // CreateElection creates a new election
@@ -76,7 +83,7 @@ export class ZVotingContract extends EntityBasedContract {
         electionId = formatElectionId(electionId);
         const election = await this.FindElection(ctx, electionId);
 
-        ZVotingContract.checkStartElectionAccess(ctx, election);
+        this.checkStartElectionAccess(ctx, election);
 
         election.Status = ElectionStatus.RUNNING;
         await this.UpdateEntity(ctx, election);
@@ -182,7 +189,7 @@ export class ZVotingContract extends EntityBasedContract {
         }
     }
 
-    private static checkStartElectionAccess(ctx: Context, election: Election) {
+    private checkStartElectionAccess(ctx: Context, election: Election) {
         if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
             throw new Error(`You must have election creator role to start an election`);
         }
@@ -197,8 +204,31 @@ export class ZVotingContract extends EntityBasedContract {
         }
     }
 
-    private static async checkPublishIdentityAccess(ctx: Context) {
-        if (!ctx.clientIdentity.assertAttributeValue(`${getSubmittingUserOrg(ctx)}.admin`, 'true')) {
+    private async checkPublishIdentityAccess(ctx: Context, n: string, e: string) {
+        if (ctx.stub.getMspID() == ctx.clientIdentity.getMSPID()) {
+            const privateKey = await this.GetImplicitPrivateData(ctx, `privateKey_${getSubmittingUserOrg(ctx)}`);
+
+            const key = new NodeRSA(privateKey);
+            const components = key.exportKey('components-public');
+
+            const nFromKey = (new BigInteger(components.n.toString('hex'), 16)).toString();
+            const eFromKey = components.e.toString();
+
+            if (nFromKey !== n || eFromKey !== e) {
+                throw new Error('Private and Public keys don\'t match');
+            }
+
+        } else {
+            const collection = this.getImplicitPrivateCollection(ctx, getSubmittingUserOrg(ctx));
+            const hash = (await ctx.stub.getPrivateDataHash(collection, `privateKey_${getSubmittingUserOrg(ctx)}`)).toString();
+        }
+
+        // if (await this.EntityExists(ctx, `identity_${getSubmittingUserOrg(ctx)}`)) {
+        //     throw new Error(`Your organization has already published identity`);
+        // }
+
+        const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
+        if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
             throw new Error(`You must be an admin to publish identity`);
         }
     }
