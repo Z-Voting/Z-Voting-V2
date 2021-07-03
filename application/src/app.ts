@@ -30,6 +30,7 @@ async function main() {
         // in a real application this would be done only when a new user was required to be added
         // and would be part of an administrative flow
         await registerAndEnrollUser(caClient, wallet, mspOrg1, org1UserId, 'org1.department1', [
+            {name: `${mspOrg1}.admin`, value: 'true', ecert: true},
             {name: 'election.judge', value: 'true', ecert: true},
             {name: 'election.creator', value: 'true', ecert: true},
         ]);
@@ -69,82 +70,69 @@ async function main() {
                 console.error(e.toString());
             }
 
-            // Get Private Endorsement Right
+            // Publish Identity
             try {
-                console.log('\n--> Submit Transaction: GetPrivateEndorsementRight');
-                await contract.submitTransaction('GetPrivateEndorsementRight', `privateData`);
-                console.log('*** Result: GetPrivateEndorsementRight succeeded');
+                const key = BlindSignature.keyGeneration({b: 2048});
+
+                const privateKey = key.exportKey('pkcs8').toString();
+                console.log('\n');
+                console.log(privateKey);
+                console.log('\n');
+
+                const n = key.keyPair.n.toString();
+                const e = key.keyPair.e.toString();
+
+                const collectionKey = `privateKey_${mspOrg1}`;
+
+                // Get Private Endorsement Right
+                // try {
+                //     console.log('\n--> Submit Transaction: AcquirePrivateEndorsementRight');
+                //     console.error(`key: ${collectionKey}`);
+                //     await contract.submitTransaction('AcquirePrivateEndorsementRight', collectionKey);
+                //     console.log('*** Result: AcquirePrivateEndorsementRight succeeded');
+                // } catch (e) {
+                //     console.error(e.toString());
+                // }
+
+                // Save Private Key
+                try {
+                    console.log('\n--> Submit Transaction: saveImplicitPrivateData');
+                    await contract.createTransaction('SaveImplicitPrivateData')
+                        .setTransient({
+                            data: Buffer.from(privateKey),
+                        })
+                        .setEndorsingOrganizations(mspOrg1)
+                        .submit(collectionKey);
+                    console.log('*** Result: saveImplicitPrivateData succeeded');
+                } catch (e) {
+                    console.error(e.toString());
+                }
+
+                // Fetch Private Key
+                try {
+                    console.log('\n--> Submit Transaction: GetImplicitPrivateData');
+                    const result = await contract.evaluateTransaction('GetImplicitPrivateData', collectionKey);
+                    console.log(`*** Result: ${result}`);
+                } catch (e) {
+                    console.error(e.toString());
+                }
+
+                console.log('\n--> Submit Transaction: PublishIdentity');
+                await contract.submitTransaction('PublishIdentity', n, e);
+                console.log('*** Result: Identity Published');
+
             } catch (e) {
                 console.error(e.toString());
             }
 
-            // // Judge is Added
-            // try {
-            //     const key = BlindSignature.keyGeneration({b: 2048});
-            //
-            //     const privateKey = key.exportKey('pkcs8').toString();
-            //     console.log("\n");
-            //     console.log(privateKey);
-            //     console.log("\n");
-            //
-            //     const n = key.keyPair.n.toString();
-            //     const e = key.keyPair.e.toString();
-            //
-            //     const rounds = 1;
-            //     console.log(`Start verifying ${rounds} signatures`);
-            //     for (let i = 0; i < rounds; i++) {
-            //         const message = "The quick brown fox jumps over a lazy dog";
-            //         const {blinded, r} = BlindSignature.blind({
-            //             message: message,
-            //             N: n,
-            //             E: e,
-            //         }); // Alice blinds message
-            //
-            //         const signed = BlindSignature.sign({
-            //             blinded: blinded,
-            //             key: key
-            //         });
-            //
-            //         const unblinded = BlindSignature.unblind({
-            //             signed: signed,
-            //             N: n,
-            //             r: r
-            //         });
-            //
-            //         // console.log("\n\n------------------------");
-            //         // console.log(unblinded.toString());
-            //         // console.log("------------------------\n\n");
-            //
-            //
-            //         const result = BlindSignature.verify({
-            //             unblinded: unblinded.toString(),
-            //             N: n,
-            //             E: e,
-            //             message: message,
-            //         });
-            //         // if (result) {
-            //         //     console.log('Alice: Signatures verify!');
-            //         // } else {
-            //         //     console.log('Alice: Invalid signature');
-            //         // }
-            //
-            //         const result2 = BlindSignature.verify2({
-            //             unblinded: unblinded.toString(),
-            //             key: key,
-            //             message: message,
-            //         });
-            //         // if (result2) {
-            //         //     console.log('Bob: Signatures verify!');
-            //         // } else {
-            //         //     console.log('Bob: Invalid signature');
-            //         // }
-            //     }
-            //     console.log("End verifying 10000 signatures");
-            //
-            //
-            // } catch (e) {
-            //     console.error(e.toString());
-            // }
+            // Judge Proposal Submitted
+            try {
+                console.log('\n--> Submit Transaction: AddJudgeProposal');
+                await contract.submitTransaction('AddJudgeProposal', electionId.toString());
+                console.log('*** Result: AddJudgeProposal succeeded');
+            } catch (e) {
+                console.error(e.toString());
+            }
 
             // One candidate is added
             try {

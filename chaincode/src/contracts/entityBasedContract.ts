@@ -9,14 +9,46 @@ export class EntityBasedContract extends Contract {
         return '_implicit_org_' + ctx.stub.getMspID();
     }
 
+    // TODO: ADD ACCESS CHECKING LATER
     @Transaction()
-    public async GetPrivateEndorsementRight(ctx: Context, key: string) {
+    public async AcquirePrivateEndorsementRight(ctx: Context, key: string) {
         const implicitPrivateCollection = '_implicit_org_' + ctx.clientIdentity.getMSPID();
 
         const ep = new KeyEndorsementPolicy();
         ep.addOrgs('PEER', ctx.clientIdentity.getMSPID());
 
         await ctx.stub.setPrivateDataValidationParameter(implicitPrivateCollection, key, ep.getPolicy());
+    }
+
+    // TODO: ADD ACCESS CHECKING LATER
+    @Transaction()
+    public async AcquireStateEndorsementRight(ctx: Context, key: string) {
+        const ep = new KeyEndorsementPolicy();
+        ep.addOrgs('PEER', ctx.clientIdentity.getMSPID());
+
+        await ctx.stub.setStateValidationParameter(key, ep.getPolicy());
+    }
+
+    @Transaction()
+    public async SaveImplicitPrivateData(ctx: Context, key: string) {
+        if (ctx.clientIdentity.getMSPID() === ctx.stub.getMspID()) {
+            const data = ctx.stub.getTransient().get('data');
+
+            if (data === null) {
+                throw new Error(`Transient Data not given`);
+            } else {
+                await this.saveImplicitPrivateData(ctx, key, data!);
+            }
+        }
+    }
+
+    @Transaction(false)
+    public async GetImplicitPrivateData(ctx: Context, key: string) {
+        if (ctx.clientIdentity.getMSPID() === ctx.stub.getMspID()) {
+            return (await ctx.stub.getPrivateData(this.getImplicitPrivateCollection(ctx), key)).toString();
+        } else {
+            throw new Error('The users does not belong to this organization');
+        }
     }
 
     // ReadEntity returns the entity stored in the world state with given id.
@@ -114,7 +146,7 @@ export class EntityBasedContract extends Contract {
 
     // GetQueryResultForQueryString executes the passed in query string.
     // Result set is built and returned as a byte array containing the JSON results.
-    public async GetQueryResultForQueryString(ctx: Context, queryString: string, wideOutput: boolean = false ) {
+    public async GetQueryResultForQueryString(ctx: Context, queryString: string, wideOutput: boolean = false) {
 
         const resultsIterator = await ctx.stub.getQueryResult(queryString);
         const results = await this.GetAllQueryResults(resultsIterator, wideOutput);
@@ -191,13 +223,20 @@ export class EntityBasedContract extends Contract {
     }
 
     // savePrivateData saves a private data to the given collection
-    protected async savePrivateData(ctx: Context, collection: string, id: string, data: string) {
-        await ctx.stub.putPrivateData(collection, id, Buffer.from(data));
+    protected async savePrivateData(ctx: Context, collection: string, id: string, data: Uint8Array) {
+        await ctx.stub.putPrivateData(collection, id, data);
     }
 
-    // savePrivateData saves a private data to the given collection
-    protected async saveImplicitPrivateData(ctx: Context, id: string, data: string) {
+    // SaveImplicitPrivateData saves a private data to the implicit private collection
+    protected async saveImplicitPrivateData(ctx: Context, id: string, data: Uint8Array) {
+
         const implicitPrivateCollection = this.getImplicitPrivateCollection(ctx);
+
+        console.log('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^');
+        console.log(implicitPrivateCollection);
+        console.log(id);
+
+        console.log('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^');
         await this.savePrivateData(ctx, implicitPrivateCollection, id, data);
     }
 }
