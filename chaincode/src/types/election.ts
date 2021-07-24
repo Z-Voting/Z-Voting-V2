@@ -1,11 +1,11 @@
 import {Object, Property} from 'fabric-contract-api';
 
 export const ElectionStatus = {
-    PENDING: "PENDING",
-    READY: "READY",
-    RUNNING: "RUNNING",
-    OVER: "OVER"
-}
+    PENDING: 'PENDING',
+    READY: 'READY',
+    RUNNING: 'RUNNING',
+    OVER: 'OVER',
+};
 
 @Object()
 export class Election {

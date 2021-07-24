@@ -1,3 +1,4 @@
+var crypto = require('crypto');
 const BlindSignature = require('blind-signatures');
 const NodeRSA = require('node-rsa');
 
@@ -82,7 +83,7 @@ async function main() {
                 const n = key.keyPair.n.toString();
                 const e = key.keyPair.e.toString();
 
-                console.log(key.keyPair);
+                // console.log(key.keyPair);
 
                 const collectionKey = `privateKey_${mspOrg1}`;
 
@@ -98,7 +99,7 @@ async function main() {
 
                 // Save Private Key
                 try {
-                    console.log('\n--> Submit Transaction: saveImplicitPrivateData');
+                    console.log('\n--> Submit Transaction: saveImplicitPrivateData (Private Key)');
                     await contract.createTransaction('SaveImplicitPrivateData')
                         .setTransient({
                             data: Buffer.from(privateKey),
@@ -120,7 +121,7 @@ async function main() {
                 }
 
                 console.log('\n--> Submit Transaction: PublishIdentity');
-                await contract.submitTransaction('PublishIdentity', n, e);
+                await contract.submitTransaction('PublishIdentity', n, e, crypto.createHash('sha256').update(Buffer.from(privateKey)).digest('base64'));
                 console.log('*** Result: Identity Published');
 
                 console.log('\n--> Evaluate Transaction: FetchIdentity');

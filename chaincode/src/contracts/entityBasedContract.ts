@@ -1,7 +1,7 @@
 import {Context, Contract, Returns, Transaction} from 'fabric-contract-api';
 import {KeyEndorsementPolicy} from 'fabric-shim';
 import {Iterators} from 'fabric-shim-api';
-import {Entity} from '../types/entity';
+import {IEntity} from '../types/IEntity';
 
 export class EntityBasedContract extends Contract {
 
@@ -67,7 +67,7 @@ export class EntityBasedContract extends Contract {
     }
 
     // SaveEntity saves a new entity in the world state
-    public async SaveEntity(ctx: Context, entity: Entity): Promise<void> {
+    public async SaveEntity(ctx: Context, entity: IEntity): Promise<void> {
         const id = entity.ID;
 
         // const exists = await this.EntityExists(ctx, id);
@@ -79,7 +79,7 @@ export class EntityBasedContract extends Contract {
     }
 
     // UpdateEntity updates an existing entity in the world state with updated value.
-    public async UpdateEntity(ctx: Context, entity: Entity): Promise<void> {
+    public async UpdateEntity(ctx: Context, entity: IEntity): Promise<void> {
         const id = entity.ID;
 
         const exists = await this.EntityExists(ctx, id);
@@ -91,7 +91,7 @@ export class EntityBasedContract extends Contract {
     }
 
     // SaveOrUpdateEntity saves or updates an entity in the world state
-    public async SaveOrUpdateEntity(ctx: Context, entity: Entity): Promise<void> {
+    public async SaveOrUpdateEntity(ctx: Context, entity: IEntity): Promise<void> {
         const id = entity.ID;
         return ctx.stub.putState(id, Buffer.from(JSON.stringify(entity)));
     }

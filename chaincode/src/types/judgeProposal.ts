@@ -1,4 +1,4 @@
-import {Object, Property} from "fabric-contract-api";
+import {Object, Property} from 'fabric-contract-api';
 
 @Object()
 export class JudgeProposal {

@@ -1,20 +1,25 @@
-const NodeRSA = require('node-rsa');
-const BigInteger = require('jsbn').BigInteger;
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
+import {BigInteger} from 'jsbn';
+import NodeRSA from 'node-rsa';
 import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
 import {formatElectionId} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
+import {Identity} from '../types/identity';
 import {JudgeProposal} from '../types/judgeProposal';
 import {EntityBasedContract} from './entityBasedContract';
-import {Identity} from "../types/identity";
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
 export class ZVotingContract extends EntityBasedContract {
 
+    private static refreshElectionStatus(election: Election) {
+        // TODO: If we have enough judges and enough Candidates, change status to ready
+        election.Status = ElectionStatus.READY;
+    }
+
     @Transaction()
-    public async PublishIdentity(ctx: Context, n: string, e: string) {
-        await this.checkPublishIdentityAccess(ctx, n, e);
+    public async PublishIdentity(ctx: Context, n: string, e: string, privateKeyHash: string) {
+        await this.checkPublishIdentityAccess(ctx, n, e, privateKeyHash);
 
         const identity = new Identity(getSubmittingUserOrg(ctx), n, e);
         await this.SaveEntity(ctx, identity);
@@ -127,11 +132,6 @@ export class ZVotingContract extends EntityBasedContract {
         return await this.QueryLedger(ctx, JSON.stringify(query));
     }
 
-    private static refreshElectionStatus(election: Election) {
-        // TODO: If we have enough judges and enough Candidates, change status to ready
-        election.Status = ElectionStatus.READY;
-    }
-
     private async checkCreateElectionAccess(ctx: Context, electionId: string) {
         electionId = formatElectionId(electionId);
 
@@ -204,8 +204,8 @@ export class ZVotingContract extends EntityBasedContract {
         }
     }
 
-    private async checkPublishIdentityAccess(ctx: Context, n: string, e: string) {
-        if (ctx.stub.getMspID() == ctx.clientIdentity.getMSPID()) {
+    private async checkPublishIdentityAccess(ctx: Context, n: string, e: string, privateKeyHash: string) {
+        if (ctx.stub.getMspID() === ctx.clientIdentity.getMSPID()) {
             const privateKey = await this.GetImplicitPrivateData(ctx, `privateKey_${getSubmittingUserOrg(ctx)}`);
 
             const key = new NodeRSA(privateKey);
@@ -221,6 +221,10 @@ export class ZVotingContract extends EntityBasedContract {
         } else {
             const collection = this.getImplicitPrivateCollection(ctx, getSubmittingUserOrg(ctx));
             const hash = (await ctx.stub.getPrivateDataHash(collection, `privateKey_${getSubmittingUserOrg(ctx)}`)).toString();
+
+            if (hash !== privateKeyHash) {
+                throw new Error(`Hash Mismatch: ${hash} \n ${privateKeyHash}`);
+            }
         }
 
         // if (await this.EntityExists(ctx, `identity_${getSubmittingUserOrg(ctx)}`)) {

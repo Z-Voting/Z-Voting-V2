@@ -1,4 +1,4 @@
-import {Object, Property} from "fabric-contract-api";
+import {Object, Property} from 'fabric-contract-api';
 
 @Object()
 export class Identity {
@@ -16,7 +16,6 @@ export class Identity {
 
     @Property()
     public E: string;
-
 
     constructor(Org: string, N: string, E: string) {
         this.DocType = 'identity';

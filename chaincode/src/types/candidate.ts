@@ -1,4 +1,4 @@
-import {Object, Property} from "fabric-contract-api";
+import {Object, Property} from 'fabric-contract-api';
 
 @Object()
 export class Candidate {
@@ -18,7 +18,7 @@ export class Candidate {
     public ElectionId: string;
 
     constructor(ID: string, Name: string, UniqueId: string, ElectionId: string) {
-        this.DocType = "candidate";
+        this.DocType = 'candidate';
 
         this.ID = ID;
         this.Name = Name;

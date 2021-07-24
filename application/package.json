@@ -9,9 +9,10 @@
         "npm": ">=5"
     },
     "scripts": {
+        "clean": "find ./dist -mindepth 1 ! -regex '^./dist/wallet\\(/.*\\)?' -delete",
         "lint": "tslint -c tslint.json 'src/**/*.ts'",
         "pretest": "npm run lint",
-        "start": "npm run build && node dist/app.js",
+        "start": "npm run clean && npm run build && node dist/app.js",
         "build": "tsc",
         "build:watch": "tsc -w",
         "prepublishOnly": "npm run build"
