@@ -220,10 +220,12 @@ export class ZVotingContract extends EntityBasedContract {
 
         } else {
             const collection = this.getImplicitPrivateCollection(ctx, getSubmittingUserOrg(ctx));
-            const hash = (await ctx.stub.getPrivateDataHash(collection, `privateKey_${getSubmittingUserOrg(ctx)}`)).toString();
 
-            if (hash !== privateKeyHash) {
-                throw new Error(`Hash Mismatch: ${hash} \n ${privateKeyHash}`);
+            const hash = (await ctx.stub.getPrivateDataHash(collection, `privateKey_${getSubmittingUserOrg(ctx)}`));
+            const base64Hash = Buffer.from(hash).toString('base64');
+
+            if (base64Hash !== privateKeyHash) {
+                throw new Error(`Hash Mismatch: ${base64Hash} \n ${privateKeyHash}`);
             }
         }
 
