@@ -1,16 +1,17 @@
 import {Context, Contract, Returns, Transaction} from 'fabric-contract-api';
 import {KeyEndorsementPolicy} from 'fabric-shim';
 import {Iterators} from 'fabric-shim-api';
+import {getImplicitPrivateCollection} from '../helper/contractHelper';
+import {EntityBasedContractHelper} from '../helper/entityBasedContractHelper';
 import {IEntity} from '../types/IEntity';
 
 export class EntityBasedContract extends Contract {
 
-    public getImplicitPrivateCollection(ctx: Context, org?: string) {
-        if (org === undefined) {
-            return '_implicit_org_' + ctx.stub.getMspID();
-        } else {
-            return '_implicit_org_' + org;
-        }
+    private helper: EntityBasedContractHelper;
+
+    constructor(name: string) {
+        super(name);
+        this.helper = new EntityBasedContractHelper();
     }
 
     // TODO: ADD ACCESS CHECKING LATER
@@ -40,30 +41,27 @@ export class EntityBasedContract extends Contract {
 
             if (data === undefined) {
                 throw new Error(`Transient Data not given`);
-            } else {
-                await this.saveImplicitPrivateData(ctx, key, data!);
             }
+
+            await this.saveImplicitPrivateData(ctx, key, data!);
         }
     }
 
     @Transaction(false)
     public async GetImplicitPrivateData(ctx: Context, key: string) {
-        if (ctx.clientIdentity.getMSPID() === ctx.stub.getMspID()) {
-            return (await ctx.stub.getPrivateData(this.getImplicitPrivateCollection(ctx), key)).toString();
-        } else {
+        if (ctx.clientIdentity.getMSPID() !== ctx.stub.getMspID()) {
             throw new Error('The users does not belong to this organization');
         }
+
+        const implicitPrivateCollection = getImplicitPrivateCollection(ctx);
+        return (await ctx.stub.getPrivateData(implicitPrivateCollection, key)).toString();
     }
 
     // ReadEntity returns the entity stored in the world state with given id.
     @Transaction(false)
     @Returns('string')
     public async ReadEntity(ctx: Context, id: string): Promise<string> {
-        const entityJSON = await ctx.stub.getState(id); // get the entity from chaincode state
-        if (!entityJSON || entityJSON.length === 0) {
-            throw new Error(`The entity with id: ${id} does not exist`);
-        }
-        return entityJSON.toString();
+        return this.helper.readEntity(ctx, id);
     }
 
     // SaveEntity saves a new entity in the world state
@@ -103,6 +101,7 @@ export class EntityBasedContract extends Contract {
         if (!exists) {
             throw new Error(`The entity with id: ${id} does not exist`);
         }
+
         return ctx.stub.deleteState(id);
     }
 
@@ -233,14 +232,7 @@ export class EntityBasedContract extends Contract {
 
     // SaveImplicitPrivateData saves a private data to the implicit private collection
     protected async saveImplicitPrivateData(ctx: Context, id: string, data: Uint8Array) {
-
-        const implicitPrivateCollection = this.getImplicitPrivateCollection(ctx);
-
-        console.log('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^');
-        console.log(implicitPrivateCollection);
-        console.log(id);
-
-        console.log('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^');
+        const implicitPrivateCollection = getImplicitPrivateCollection(ctx);
         await this.savePrivateData(ctx, implicitPrivateCollection, id, data);
     }
 }

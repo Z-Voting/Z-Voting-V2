@@ -1,8 +1,8 @@
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
 import NodeRSA from 'node-rsa';
-import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
-import {formatElectionId} from '../helper/zVotingContractHelper';
+import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
+import {formatElectionId, refreshElectionStatus} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
 import {Identity} from '../types/identity';
@@ -12,9 +12,8 @@ import {EntityBasedContract} from './entityBasedContract';
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
 export class ZVotingContract extends EntityBasedContract {
 
-    private static refreshElectionStatus(election: Election) {
-        // TODO: If we have enough judges and enough Candidates, change status to ready
-        election.Status = ElectionStatus.READY;
+    constructor(name: string) {
+        super(name);
     }
 
     @Transaction()
@@ -66,7 +65,7 @@ export class ZVotingContract extends EntityBasedContract {
         const candidate = new Candidate(candidateId, name, uniqueId, election.ID);
         await this.SaveEntity(ctx, candidate);
 
-        ZVotingContract.refreshElectionStatus(election);
+        refreshElectionStatus(election);
         await this.UpdateEntity(ctx, election);
     }
 
@@ -219,7 +218,7 @@ export class ZVotingContract extends EntityBasedContract {
             }
 
         } else {
-            const collection = this.getImplicitPrivateCollection(ctx, getSubmittingUserOrg(ctx));
+            const collection = getImplicitPrivateCollection(ctx, getSubmittingUserOrg(ctx));
 
             const hash = (await ctx.stub.getPrivateDataHash(collection, `privateKey_${getSubmittingUserOrg(ctx)}`));
             const base64Hash = Buffer.from(hash).toString('base64');

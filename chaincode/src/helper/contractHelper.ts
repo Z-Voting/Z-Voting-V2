@@ -15,3 +15,11 @@ export function getSubmittingUserUID(ctx: Context) {
 
     return `${userId}@${mspId}`;
 }
+
+export function getImplicitPrivateCollection(ctx: Context, org?: string) {
+    if (org === undefined) {
+        return '_implicit_org_' + ctx.stub.getMspID();
+    } else {
+        return '_implicit_org_' + org;
+    }
+}
