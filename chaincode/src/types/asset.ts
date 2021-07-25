@@ -1,7 +1,3 @@
-/*
-  SPDX-License-Identifier: Apache-2.0
-*/
-
 import {Object, Property} from 'fabric-contract-api';
 
 @Object()
@@ -23,7 +19,6 @@ export class Asset {
 
     @Property()
     public AppraisedValue: number;
-
 
     constructor(ID: string, Color: string, Size: number, Owner: string, AppraisedValue: number) {
         this.ID = ID;
