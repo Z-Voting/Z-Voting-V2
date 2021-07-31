@@ -2,6 +2,7 @@ import {Context} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
 import NodeRSA from 'node-rsa';
 import {Election, ElectionStatus} from '../types/election';
+import {JudgeProposal} from '../types/judgeProposal';
 import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from './contractHelper';
 import {EntityBasedContractHelper} from './entityBasedContractHelper';
 
@@ -90,6 +91,25 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         }
     }
 
+    public async checkJudgeProposalManagementAccess(ctx: Context, judgeProposal: JudgeProposal, election: Election) {
+        if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
+            throw new Error(`You must have election creator role to start an election`);
+        }
+
+        const submittingUserUID = getSubmittingUserUID(ctx);
+        if (election.Owner !== submittingUserUID) {
+            throw new Error(`Only the election owner can start an election`);
+        }
+
+        if ([ElectionStatus.RUNNING, ElectionStatus.OVER].includes(election.Status)) {
+            throw new Error(`The election with id: ${election.ID} cannot be modified when state is ${election.Status}`);
+        }
+
+        if (!(await this.entityExists(ctx, judgeProposal.ID))) {
+            throw new Error(`Judge Proposal with id ${judgeProposal.ID} does not exit`);
+        }
+    }
+
     public checkStartElectionAccess(ctx: Context, election: Election) {
         if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
             throw new Error(`You must have election creator role to start an election`);
@@ -139,5 +159,4 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             throw new Error(`You must be an admin to publish identity`);
         }
     }
-
 }

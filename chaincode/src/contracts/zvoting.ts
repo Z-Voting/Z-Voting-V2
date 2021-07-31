@@ -1,12 +1,10 @@
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
-import {BigInteger} from 'jsbn';
-import NodeRSA from 'node-rsa';
-import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
+import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
 import {ZVotingContractHelper} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
 import {Identity} from '../types/identity';
-import {JudgeProposal} from '../types/judgeProposal';
+import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
 import {EntityBasedContract} from './entityBasedContract';
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
@@ -82,6 +80,43 @@ export class ZVotingContract extends EntityBasedContract {
 
         const judgeProposal = new JudgeProposal(getSubmittingUserOrg(ctx), electionId);
         await this.zVotingHelper.saveEntity(ctx, judgeProposal);
+    }
+
+    // DeclineJudgeProposal declines a judge proposal to the election
+    @Transaction()
+    public async DeclineJudgeProposal(ctx: Context, judgeProposalId: string): Promise<void> {
+        const judgeProposal = JSON.parse(await this.zVotingHelper.readEntity(ctx, judgeProposalId)) as JudgeProposal;
+        const election = await this.FindElection(ctx, judgeProposal.ElectionId);
+
+        await this.zVotingHelper.checkJudgeProposalManagementAccess(ctx, judgeProposal, election);
+
+        judgeProposal.Status = JudgeProposalStatus.DECLINED;
+        await this.zVotingHelper.updateEntity(ctx, judgeProposal);
+    }
+
+    // ApproveJudgeProposal declines a judge proposal to the election
+    @Transaction()
+    public async ApproveJudgeProposal(ctx: Context, judgeProposalId: string): Promise<void> {
+        const judgeProposal = JSON.parse(await this.zVotingHelper.readEntity(ctx, judgeProposalId)) as JudgeProposal;
+        const election = await this.FindElection(ctx, judgeProposal.ElectionId);
+
+        await this.zVotingHelper.checkJudgeProposalManagementAccess(ctx, judgeProposal, election);
+
+        judgeProposal.Status = JudgeProposalStatus.APPROVED;
+        await this.zVotingHelper.updateEntity(ctx, judgeProposal);
+    }
+
+    @Transaction(false)
+    public async GetJudgeProposals(ctx: Context, electionId: string): Promise<string> {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+
+        const query: any = {};
+        query.selector = {};
+
+        query.selector.DocType = 'judgeProposal';
+        query.selector.ElectionId = electionId;
+
+        return await this.zVotingHelper.queryLedger(ctx, JSON.stringify(query));
     }
 
     // StartElection starts an election if it is ready

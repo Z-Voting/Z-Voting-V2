@@ -49,6 +49,10 @@ export class EntityBasedContractHelper {
         return ctx.stub.putState(id, Buffer.from(JSON.stringify(entity)));
     }
 
+    public async deleteEntity(ctx: Context, entity: IEntity) {
+        await ctx.stub.deleteState(entity.ID);
+    }
+
     public async queryLedger(ctx: Context, queryString: string, wideOutput: boolean = false) {
         return await this.getQueryResultForQueryString(ctx, queryString, wideOutput);
     }

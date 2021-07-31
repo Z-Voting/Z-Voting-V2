@@ -141,6 +141,15 @@ async function main() {
                 console.error(e.toString());
             }
 
+            // Judge Proposal Approved
+            try {
+                console.log('\n--> Submit Transaction: ApproveJudgeProposal');
+                await contract.submitTransaction('ApproveJudgeProposal', `judgeProposal_election${electionId}_${mspOrg1}`);
+                console.log('*** Result: ApproveJudgeProposal succeeded');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
             // One candidate is added
             try {
                 console.log('\n--> Submit Transaction: AddCandidate');
@@ -180,6 +189,15 @@ async function main() {
             try {
                 console.log('\n--> Evaluate Transaction: GetCandidates');
                 const result = await contract.evaluateTransaction('GetCandidates', `${electionId}`);
+                console.log(`*** Result: ${result}`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // Get Election Judge Proposals
+            try {
+                console.log('\n--> Evaluate Transaction: GetJudgeProposals');
+                const result = await contract.evaluateTransaction('GetJudgeProposals', `${electionId}`);
                 console.log(`*** Result: ${result}`);
             } catch (e) {
                 console.error(e.toString());
