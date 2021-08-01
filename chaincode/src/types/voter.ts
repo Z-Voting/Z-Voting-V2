@@ -20,7 +20,7 @@ export class Voter {
     @Property()
     public ElectionId: string;
 
-    constructor(Org: string, Email: string, Name: string, ElectionId: string) {
+    constructor(Name: string, Email: string, Org: string, ElectionId: string) {
         this.DocType = 'voter';
         this.ID = `voter_${ElectionId}_${Email}`;
 

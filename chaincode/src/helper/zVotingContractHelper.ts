@@ -218,4 +218,16 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
 
         election.Metadata.JudgesPerVotePart = getJudgesPerVotePart(election.Metadata.Judges, votePartCopies);
     }
+
+    public async checkAddVoterAccess(ctx: Context, election: Election) {
+
+        if(![ElectionStatus.PENDING, ElectionStatus.READY].includes(election.Status)) {
+            throw new Error(`You cannot add voter when election status is ${election.Status}`);
+        }
+
+        const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
+        if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
+            throw new Error(`You must be an admin to add voter`);
+        }
+    }
 }

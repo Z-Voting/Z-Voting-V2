@@ -240,6 +240,22 @@ async function main() {
                 console.error(e.toString());
             }
 
+            try {
+                console.log(`\n--> Submit Transaction: AddVoter`);
+                await contract.submitTransaction('AddVoter', 'TKD', 'tkd@gmail.com', orgMsp, `election${electionId}`);
+                console.log(`*** Result: AddVoter Succeeded`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            try {
+                console.log(`\n--> Submit Transaction: AddVoter`);
+                await contract.submitTransaction('AddVoter', 'AKD', 'akd@gmail.com', orgMsp, `election${electionId}`);
+                console.log(`*** Result: AddVoter Succeeded`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
             // Election is started
             try {
                 console.log('\n--> Submit Transaction: StartElection');

@@ -5,6 +5,7 @@ import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
 import {Identity} from '../types/identity';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
+import {Voter} from '../types/voter';
 import {EntityBasedContract} from './entityBasedContract';
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
@@ -84,18 +85,22 @@ export class ZVotingContract extends EntityBasedContract {
         await this.zVotingHelper.deleteEntity(ctx, candidate);
     }
 
-    // // AddCandidate adds a candidate to the election
-    // @Transaction()
-    // public async AddCandidate(ctx: Context, name: string, uniqueId: string, electionId: string): Promise<void> {
-    //     electionId = this.zVotingHelper.formatElectionId(electionId);
-    //
-    //     const election = await this.FindElection(ctx, electionId);
-    //     await this.zVotingHelper.checkManageCandidateAccess(ctx, election, uniqueId);
-    //
-    //     const candidateId = `candidate_${election.ID}_${uniqueId}`;
-    //     const candidate = new Candidate(candidateId, name, uniqueId, election.ID);
-    //     await this.zVotingHelper.saveEntity(ctx, candidate);
-    // }
+    // AddCandidate adds a candidate to the election
+    @Transaction()
+    public async AddVoter(ctx: Context, name: string, email: string, org: string, electionId: string): Promise<void> {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+
+        const election = await this.FindElection(ctx, electionId);
+        await this.zVotingHelper.checkAddVoterAccess(ctx, election);
+
+        const voterId = `voter_${electionId}_${email}`;
+        if (await this.zVotingHelper.entityExists(ctx, voterId)) {
+            throw new Error(`Voter with email ${email} already exists`);
+        }
+
+        const voter = new Voter(name, email, org, electionId);
+        await this.zVotingHelper.saveEntity(ctx, voter);
+    }
 
     // AddJudgeProposal adds a judge proposal to the election
     @Transaction()
