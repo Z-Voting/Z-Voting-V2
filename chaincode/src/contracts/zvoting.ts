@@ -65,9 +65,6 @@ export class ZVotingContract extends EntityBasedContract {
         const candidateId = `candidate_${election.ID}_${uniqueId}`;
         const candidate = new Candidate(candidateId, name, uniqueId, election.ID);
         await this.zVotingHelper.saveEntity(ctx, candidate);
-
-        this.zVotingHelper.refreshElectionStatus(election);
-        await this.zVotingHelper.updateEntity(ctx, election);
     }
 
     // AddJudgeProposal adds a judge proposal to the election
@@ -131,6 +128,32 @@ export class ZVotingContract extends EntityBasedContract {
         query.selector.Status = JudgeProposalStatus.APPROVED;
 
         return await this.zVotingHelper.queryLedger(ctx, JSON.stringify(query));
+    }
+
+    // MarkElectionAsReady changes the election status to ready
+    @Transaction()
+    public async MarkElectionAsReady(ctx: Context, electionId: string, trustThreshold: number): Promise<void> {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        this.zVotingHelper.checkMarkElectionAsReadyAccess(ctx, election);
+
+        const judgeProposals = JSON.parse(await this.GetJudgeProposals(ctx, electionId)) as JudgeProposal[];
+
+        const pendingJudgeProposals = judgeProposals.filter((proposal) => proposal.Status === JudgeProposalStatus.PENDING);
+        const judges = judgeProposals.filter((proposal) => proposal.Status === JudgeProposalStatus.APPROVED);
+
+        for (const proposal of pendingJudgeProposals) {
+            proposal.Status = JudgeProposalStatus.DECLINED;
+            await this.zVotingHelper.updateEntity(ctx, proposal);
+        }
+
+        if (judges.length < trustThreshold) {
+            throw new Error(`Currently we have ${judges.length} judges, which cannot be less than trust threshold ${trustThreshold}`);
+        }
+
+        election.Status = ElectionStatus.READY;
+        await this.zVotingHelper.updateEntity(ctx, election);
     }
 
     // StartElection starts an election if it is ready

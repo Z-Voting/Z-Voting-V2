@@ -16,11 +16,6 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         return electionId;
     }
 
-    public refreshElectionStatus(election: Election) {
-        // TODO: If we have enough judges and enough Candidates, change status to ready
-        election.Status = ElectionStatus.READY;
-    }
-
     public async checkCreateElectionAccess(ctx: Context, electionId: string) {
         electionId = this.formatElectionId(electionId);
 
@@ -56,7 +51,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             throw new Error(`Only the election owner can add a candidate`);
         }
 
-        if (election.Status === ElectionStatus.RUNNING || election.Status === ElectionStatus.OVER) {
+        if (election.Status !== ElectionStatus.PENDING) {
             throw new Error(`The election with id: ${election.ID} is not accepting any more candidates`);
         }
 
@@ -86,7 +81,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             throw new Error(`You must have election judge role to make your organization a judge of this election`);
         }
 
-        if (election.Status !== ElectionStatus.PENDING && election.Status !== ElectionStatus.READY) {
+        if (election.Status !== ElectionStatus.PENDING) {
             throw new Error(`The election with id: ${election.ID} is not accepting any more judge proposals`);
         }
     }
@@ -101,7 +96,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             throw new Error(`Only the election owner can start an election`);
         }
 
-        if ([ElectionStatus.RUNNING, ElectionStatus.OVER].includes(election.Status)) {
+        if (election.Status !== ElectionStatus.PENDING) {
             throw new Error(`The election with id: ${election.ID} cannot be modified when state is ${election.Status}`);
         }
 
@@ -157,6 +152,21 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
         if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
             throw new Error(`You must be an admin to publish identity`);
+        }
+    }
+
+    public checkMarkElectionAsReadyAccess(ctx: Context, election: Election) {
+        if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
+            throw new Error(`You must have election creator role to mark an election as READY`);
+        }
+
+        const submittingUserUID = getSubmittingUserUID(ctx);
+        if (election.Owner !== submittingUserUID) {
+            throw new Error(`Only the election owner can mark an election as READY`);
+        }
+
+        if (election.Status !== ElectionStatus.PENDING) {
+            throw new Error(`The election with id: ${election.ID} must be in PENDING state to mark as ready, current state is ${election.Status}`);
         }
     }
 }

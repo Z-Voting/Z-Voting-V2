@@ -212,6 +212,14 @@ async function main() {
                 console.error(e.toString());
             }
 
+            try {
+                console.log(`\n--> Submit Transaction: MarkElectionAsReady`);
+                await contract.submitTransaction('MarkElectionAsReady', `election${electionId}`, '1');
+                console.log(`*** Result: MarkElectionAsReady Succeeded`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
             // Election is started
             try {
                 console.log('\n--> Submit Transaction: StartElection');
