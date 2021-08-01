@@ -2,10 +2,10 @@ var crypto = require('crypto');
 const BlindSignature = require('blind-signatures');
 const NodeRSA = require('node-rsa');
 
-import {Gateway, GatewayOptions} from 'fabric-network';
+import { Gateway, GatewayOptions } from 'fabric-network';
 import * as path from 'path';
-import {buildCCPOrg1, buildWallet} from './utils/AppUtil';
-import {buildCAClient, enrollAdmin, registerAndEnrollUser} from './utils/CAUtil';
+import { buildCCPOrg1, buildWallet } from './utils/AppUtil';
+import { buildCAClient, enrollAdmin, registerAndEnrollUser } from './utils/CAUtil';
 
 const channelName = 'zvoting';
 const chaincodeName = 'zvoting';
@@ -31,9 +31,9 @@ async function main() {
         // in a real application this would be done only when a new user was required to be added
         // and would be part of an administrative flow
         await registerAndEnrollUser(caClient, wallet, mspOrg1, org1UserId, 'org1.department1', [
-            {name: `${mspOrg1}.admin`, value: 'true', ecert: true},
-            {name: 'election.judge', value: 'true', ecert: true},
-            {name: 'election.creator', value: 'true', ecert: true},
+            { name: `${mspOrg1}.admin`, value: 'true', ecert: true },
+            { name: 'election.judge', value: 'true', ecert: true },
+            { name: 'election.creator', value: 'true', ecert: true },
         ]);
 
         // Create a new gateway instance for interacting with the fabric network.
@@ -44,7 +44,7 @@ async function main() {
         const gatewayOpts: GatewayOptions = {
             wallet,
             identity: org1UserId,
-            discovery: {enabled: true, asLocalhost: true}, // using asLocalhost as this gateway is using a fabric network deployed locally
+            discovery: { enabled: true, asLocalhost: true }, // using asLocalhost as this gateway is using a fabric network deployed locally
         };
 
         try {
@@ -73,7 +73,7 @@ async function main() {
 
             // Publish Identity
             try {
-                const key = BlindSignature.keyGeneration({b: 2048});
+                const key = BlindSignature.keyGeneration({ b: 2048 });
 
                 const privateKey = key.exportKey('pkcs8').toString();
                 console.log('\n');
@@ -198,6 +198,15 @@ async function main() {
             try {
                 console.log('\n--> Evaluate Transaction: GetJudgeProposals');
                 const result = await contract.evaluateTransaction('GetJudgeProposals', `${electionId}`);
+                console.log(`*** Result: ${result}`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // Get Election Judge Proposals
+            try {
+                console.log('\n--> Evaluate Transaction: GetJudges');
+                const result = await contract.evaluateTransaction('GetJudges', `${electionId}`);
                 console.log(`*** Result: ${result}`);
             } catch (e) {
                 console.error(e.toString());

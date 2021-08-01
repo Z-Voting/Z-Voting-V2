@@ -119,6 +119,20 @@ export class ZVotingContract extends EntityBasedContract {
         return await this.zVotingHelper.queryLedger(ctx, JSON.stringify(query));
     }
 
+    @Transaction(false)
+    public async GetJudges(ctx: Context, electionId: string): Promise<string> {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+
+        const query: any = {};
+        query.selector = {};
+
+        query.selector.DocType = 'judgeProposal';
+        query.selector.ElectionId = electionId;
+        query.selector.Status = JudgeProposalStatus.APPROVED;
+
+        return await this.zVotingHelper.queryLedger(ctx, JSON.stringify(query));
+    }
+
     // StartElection starts an election if it is ready
     @Transaction()
     public async StartElection(ctx: Context, electionId: string): Promise<void> {
