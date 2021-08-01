@@ -1,4 +1,5 @@
 import {Object, Property} from 'fabric-contract-api';
+import {ElectionMetadata} from './electionMetadata';
 
 export const ElectionStatus = {
     PENDING: 'PENDING',
@@ -27,6 +28,9 @@ export class Election {
     @Property()
     public OwnerOrg: string;
 
+    @Property()
+    public Metadata: ElectionMetadata;
+
     constructor(ID: string, Name: string, Status: string, Owner: string, OwnerOrg: string) {
         this.DocType = 'election';
 
@@ -35,6 +39,8 @@ export class Election {
         this.Status = Status;
         this.Owner = Owner;
         this.OwnerOrg = OwnerOrg;
+
+        this.Metadata = new ElectionMetadata();
     }
 }
 

@@ -229,6 +229,15 @@ async function main() {
                 console.error(e.toString());
             }
 
+            // Get Elections
+            try {
+                console.log('\n--> Evaluate Transaction: GetElections');
+                const result = await contract.evaluateTransaction('GetElections');
+                console.log(`*** Result: ${result}`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
         } finally {
             // Disconnect from the gateway when the application is closing
             // This will close all connections to the network

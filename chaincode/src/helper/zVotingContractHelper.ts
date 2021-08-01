@@ -169,4 +169,30 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             throw new Error(`The election with id: ${election.ID} must be in PENDING state to mark as ready, current state is ${election.Status}`);
         }
     }
+
+    public calculateDistributionScheme(election: Election) {
+        const judgeCount = election.Metadata.JudgeCount!;
+        const trustThreshold = election.Metadata.TrustThreshold!;
+
+        function combination(n: number, r: number) {
+            r = (n - r) < r ? (n - r) : r;
+
+            let result = new BigInteger('1');
+
+            for (let i = 0; i < r; i++) {
+                const up = n - i;
+                const down = i + 1;
+
+                result = result.multiply(new BigInteger(up.toString()));
+                result = result.divide(new BigInteger(down.toString()));
+            }
+
+            return result;
+        }
+
+        const voteParts = combination(judgeCount, judgeCount - trustThreshold + 1);
+        election.Metadata.VotePartCount = Number(voteParts);
+
+        election.Metadata.VotePartCopies = judgeCount - trustThreshold + 1;
+    }
 }

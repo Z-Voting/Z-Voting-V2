@@ -152,6 +152,12 @@ export class ZVotingContract extends EntityBasedContract {
             throw new Error(`Currently we have ${judges.length} judges, which cannot be less than trust threshold ${trustThreshold}`);
         }
 
+        election.Metadata.Judges = judges;
+        election.Metadata.TrustThreshold = trustThreshold;
+        election.Metadata.JudgeCount = judges.length;
+
+        this.zVotingHelper.calculateDistributionScheme(election);
+
         election.Status = ElectionStatus.READY;
         await this.zVotingHelper.updateEntity(ctx, election);
     }
