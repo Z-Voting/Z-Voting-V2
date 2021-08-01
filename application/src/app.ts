@@ -9,7 +9,7 @@ import { buildCAClient, enrollAdmin, registerAndEnrollUser } from './utils/CAUti
 
 const channelName = 'zvoting';
 const chaincodeName = 'zvoting';
-const mspOrg1 = 'Org1MSP';
+const orgMsp = 'Org1MSP';
 const walletPath = path.join(__dirname, 'wallet');
 const org1UserId = 'appUser';
 
@@ -26,14 +26,16 @@ async function main() {
         const wallet = await buildWallet(walletPath);
 
         // in a real application this would be done on an administrative flow, and only once
-        await enrollAdmin(caClient, wallet, mspOrg1);
+        await enrollAdmin(caClient, wallet, orgMsp);
 
         // in a real application this would be done only when a new user was required to be added
         // and would be part of an administrative flow
-        await registerAndEnrollUser(caClient, wallet, mspOrg1, org1UserId, 'org1.department1', [
-            { name: `${mspOrg1}.admin`, value: 'true', ecert: true },
+        await registerAndEnrollUser(caClient, wallet, orgMsp, org1UserId, 'org1.department1', [
+            { name: `${orgMsp}.admin`, value: 'true', ecert: true },
             { name: 'election.judge', value: 'true', ecert: true },
             { name: 'election.creator', value: 'true', ecert: true },
+            { name: 'election.voter', value: 'true', ecert: true },
+            { name: 'email', value: `admin@${orgMsp}.com`, ecert: true },
         ]);
 
         // Create a new gateway instance for interacting with the fabric network.
@@ -85,7 +87,7 @@ async function main() {
 
                 // console.log(key.keyPair);
 
-                const collectionKey = `privateKey_${mspOrg1}`;
+                const collectionKey = `privateKey_${orgMsp}`;
 
                 // Get Private Endorsement Right
                 // try {
@@ -104,7 +106,7 @@ async function main() {
                         .setTransient({
                             data: Buffer.from(privateKey),
                         })
-                        .setEndorsingOrganizations(mspOrg1)
+                        .setEndorsingOrganizations(orgMsp)
                         .submit(collectionKey);
                     console.log('*** Result: saveImplicitPrivateData succeeded');
                 } catch (e) {
@@ -125,7 +127,7 @@ async function main() {
                 console.log('*** Result: Identity Published');
 
                 console.log('\n--> Evaluate Transaction: FetchIdentity');
-                const result = await contract.evaluateTransaction('FetchIdentity', mspOrg1);
+                const result = await contract.evaluateTransaction('FetchIdentity', orgMsp);
                 console.log(`*** Result: ${result}`);
 
             } catch (e) {
@@ -144,7 +146,7 @@ async function main() {
             // Judge Proposal Approved
             try {
                 console.log('\n--> Submit Transaction: ApproveJudgeProposal');
-                await contract.submitTransaction('ApproveJudgeProposal', `judgeProposal_election${electionId}_${mspOrg1}`);
+                await contract.submitTransaction('ApproveJudgeProposal', `judgeProposal_election${electionId}_${orgMsp}`);
                 console.log('*** Result: ApproveJudgeProposal succeeded');
             } catch (e) {
                 console.error(e.toString());
