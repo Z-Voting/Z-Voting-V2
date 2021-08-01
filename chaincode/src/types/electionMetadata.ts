@@ -4,7 +4,10 @@ import {JudgeProposal} from './judgeProposal';
 @Object()
 export class ElectionMetadata {
     @Property('Judges', 'JudgeProposal[]')
-    public Judges?: JudgeProposal[];
+    public Judges: JudgeProposal[];
+
+    @Property('JudgesPerVotePart', 'string[][]')
+    public JudgesPerVotePart: string[][];
 
     @Property()
     public JudgeCount?: number;
@@ -20,5 +23,6 @@ export class ElectionMetadata {
 
     constructor() {
         this.Judges = [];
+        this.JudgesPerVotePart = [];
     }
 }

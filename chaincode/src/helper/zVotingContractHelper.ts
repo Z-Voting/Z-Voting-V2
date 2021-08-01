@@ -190,9 +190,37 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             return result;
         }
 
-        const voteParts = combination(judgeCount, judgeCount - trustThreshold + 1);
-        election.Metadata.VotePartCount = Number(voteParts);
+        function getJudgesPerVotePart(judges: JudgeProposal[], copies: number) {
+            const judgeOrgs = election.Metadata.Judges!.map((judge) => judge.Org);
 
-        election.Metadata.VotePartCopies = judgeCount - trustThreshold + 1;
+            const judgesPerVotePart: string[][] = [];
+            const judgeCombination: string[] = [];
+
+            const rec = (idx: number, cnt: number) => {
+                if (idx === judgeOrgs.length) {
+                    if (cnt === copies) {
+                        judgesPerVotePart.push([...judgeCombination]);
+                    }
+                    return;
+                }
+
+                rec(idx + 1, cnt);
+
+                judgeCombination.push(judgeOrgs[idx]);
+                rec(idx + 1, cnt + 1);
+                judgeCombination.pop();
+            };
+
+            rec(0, 0);
+            return judgesPerVotePart;
+        }
+
+        const votePartCopies = judgeCount - trustThreshold + 1;
+        election.Metadata.VotePartCopies = votePartCopies;
+
+        const votePartCount = combination(judgeCount, votePartCopies);
+        election.Metadata.VotePartCount = Number(votePartCount);
+
+        election.Metadata.JudgesPerVotePart = getJudgesPerVotePart(election.Metadata.Judges, votePartCopies);
     }
 }
