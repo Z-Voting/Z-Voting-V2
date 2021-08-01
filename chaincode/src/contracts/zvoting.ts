@@ -60,12 +60,42 @@ export class ZVotingContract extends EntityBasedContract {
         electionId = this.zVotingHelper.formatElectionId(electionId);
 
         const election = await this.FindElection(ctx, electionId);
-        await this.zVotingHelper.checkAddCandidateAccess(ctx, election, uniqueId);
+        await this.zVotingHelper.checkManageCandidateAccess(ctx, election, uniqueId);
+
+        const duplicateCandidateExists = await this.zVotingHelper.duplicateCandidateExists(ctx, uniqueId, election.ID);
+        if (duplicateCandidateExists) {
+            throw new Error(`Another candidate with UniqueID: ${uniqueId} already exists for this election`);
+        }
 
         const candidateId = `candidate_${election.ID}_${uniqueId}`;
         const candidate = new Candidate(candidateId, name, uniqueId, election.ID);
         await this.zVotingHelper.saveEntity(ctx, candidate);
     }
+
+    // RemoveCandidate removes a candidate from the election
+    @Transaction()
+    public async RemoveCandidate(ctx: Context, candidateId: string, electionId: string): Promise<void> {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+
+        const election = await this.FindElection(ctx, electionId);
+        const candidate = JSON.parse(await this.zVotingHelper.readEntity(ctx, candidateId)) as Candidate;
+
+        await this.zVotingHelper.checkManageCandidateAccess(ctx, election, candidate.UniqueId);
+        await this.zVotingHelper.deleteEntity(ctx, candidate);
+    }
+
+    // // AddCandidate adds a candidate to the election
+    // @Transaction()
+    // public async AddCandidate(ctx: Context, name: string, uniqueId: string, electionId: string): Promise<void> {
+    //     electionId = this.zVotingHelper.formatElectionId(electionId);
+    //
+    //     const election = await this.FindElection(ctx, electionId);
+    //     await this.zVotingHelper.checkManageCandidateAccess(ctx, election, uniqueId);
+    //
+    //     const candidateId = `candidate_${election.ID}_${uniqueId}`;
+    //     const candidate = new Candidate(candidateId, name, uniqueId, election.ID);
+    //     await this.zVotingHelper.saveEntity(ctx, candidate);
+    // }
 
     // AddJudgeProposal adds a judge proposal to the election
     @Transaction()

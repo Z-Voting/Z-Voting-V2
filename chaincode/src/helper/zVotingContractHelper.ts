@@ -41,7 +41,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         return await this.queryResultExists(ctx, JSON.stringify(query));
     }
 
-    public async checkAddCandidateAccess(ctx: Context, election: Election, uniqueId: string) {
+    public async checkManageCandidateAccess(ctx: Context, election: Election, uniqueId: string) {
         if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
             throw new Error(`You must have election creator role to add candidate to an election`);
         }
@@ -53,11 +53,6 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
 
         if (election.Status !== ElectionStatus.PENDING) {
             throw new Error(`The election with id: ${election.ID} is not accepting any more candidates`);
-        }
-
-        const duplicateCandidateExists = await this.duplicateCandidateExists(ctx, uniqueId, election.ID);
-        if (duplicateCandidateExists) {
-            throw new Error(`Another candidate with UniqueID: ${uniqueId} already exists for this election`);
         }
     }
 

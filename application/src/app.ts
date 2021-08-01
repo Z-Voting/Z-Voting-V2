@@ -178,6 +178,24 @@ async function main() {
                 console.error(e.toString());
             }
 
+            // Remove candidate
+            try {
+                console.log('\n--> Submit Transaction: RemoveCandidate');
+                await contract.submitTransaction('RemoveCandidate', `candidate_election${electionId}_PartyBCandidateB`, `${electionId}`);
+                console.log('*** Result: Candidate Removed');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            // One candidate is added
+            try {
+                console.log('\n--> Submit Transaction: AddCandidate');
+                await contract.submitTransaction('AddCandidate', 'Candidate B', 'PartyBCandidateB', `${electionId}`);
+                console.log('*** Result: Candidate Added');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
             // Get Elections
             try {
                 console.log('\n--> Evaluate Transaction: GetElections');
