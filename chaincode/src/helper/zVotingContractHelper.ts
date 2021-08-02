@@ -2,6 +2,7 @@ import {Context} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
 import NodeRSA from 'node-rsa';
 import {Election, ElectionStatus} from '../types/election';
+import {OrgVoteParts} from '../types/electionMetadata';
 import {JudgeProposal} from '../types/judgeProposal';
 import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from './contractHelper';
 import {EntityBasedContractHelper} from './entityBasedContractHelper';
@@ -41,7 +42,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         return await this.queryResultExists(ctx, JSON.stringify(query));
     }
 
-    public async checkManageCandidateAccess(ctx: Context, election: Election, uniqueId: string) {
+    public async checkManageCandidateAccess(ctx: Context, election: Election) {
         if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
             throw new Error(`You must have election creator role to add candidate to an election`);
         }
@@ -188,13 +189,13 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         function getJudgesPerVotePart(judges: JudgeProposal[], copies: number) {
             const judgeOrgs = election.Metadata.Judges!.map((judge) => judge.Org);
 
-            const judgesPerVotePart: string[][] = [];
+            const judgesPerPart: string[][] = [];
             const judgeCombination: string[] = [];
 
             const rec = (idx: number, cnt: number) => {
                 if (idx === judgeOrgs.length) {
                     if (cnt === copies) {
-                        judgesPerVotePart.push([...judgeCombination]);
+                        judgesPerPart.push([...judgeCombination]);
                     }
                     return;
                 }
@@ -207,21 +208,38 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             };
 
             rec(0, 0);
-            return judgesPerVotePart;
+            return judgesPerPart;
+        }
+
+        function getVotePartsPerJudge(judgesPerVotePart: string[][]) {
+            const votePartsPerJudge = new Map<string, number[]>();
+
+            judgesPerVotePart.forEach((orgs, index) => {
+                orgs.forEach((org) => {
+                    if (!votePartsPerJudge.has(org)) {
+                        votePartsPerJudge.set(org, []);
+                    }
+
+                    votePartsPerJudge.get(org)!.push(index);
+                    console.log(org, index);
+                });
+            });
+
+            return Array.from(votePartsPerJudge.keys())
+                .map((org) => new OrgVoteParts(org, votePartsPerJudge.get(org)!));
         }
 
         const votePartCopies = judgeCount - trustThreshold + 1;
         election.Metadata.VotePartCopies = votePartCopies;
 
-        const votePartCount = combination(judgeCount, votePartCopies);
-        election.Metadata.VotePartCount = Number(votePartCount);
-
-        election.Metadata.JudgesPerVotePart = getJudgesPerVotePart(election.Metadata.Judges, votePartCopies);
+        election.Metadata.VotePartCount = Number(combination(judgeCount, votePartCopies));
+        election.Metadata.JudgesPerVotePart = getJudgesPerVotePart(election.Metadata.Judges!, votePartCopies);
+        election.Metadata.VotePartsPerJudge = getVotePartsPerJudge(election.Metadata.JudgesPerVotePart);
     }
 
     public async checkAddVoterAccess(ctx: Context, election: Election) {
 
-        if(![ElectionStatus.PENDING, ElectionStatus.READY].includes(election.Status)) {
+        if (![ElectionStatus.PENDING, ElectionStatus.READY].includes(election.Status)) {
             throw new Error(`You cannot add voter when election status is ${election.Status}`);
         }
 

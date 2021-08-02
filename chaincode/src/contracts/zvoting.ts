@@ -61,7 +61,7 @@ export class ZVotingContract extends EntityBasedContract {
         electionId = this.zVotingHelper.formatElectionId(electionId);
 
         const election = await this.FindElection(ctx, electionId);
-        await this.zVotingHelper.checkManageCandidateAccess(ctx, election, uniqueId);
+        await this.zVotingHelper.checkManageCandidateAccess(ctx, election);
 
         const duplicateCandidateExists = await this.zVotingHelper.duplicateCandidateExists(ctx, uniqueId, election.ID);
         if (duplicateCandidateExists) {
@@ -81,7 +81,7 @@ export class ZVotingContract extends EntityBasedContract {
         const election = await this.FindElection(ctx, electionId);
         const candidate = JSON.parse(await this.zVotingHelper.readEntity(ctx, candidateId)) as Candidate;
 
-        await this.zVotingHelper.checkManageCandidateAccess(ctx, election, candidate.UniqueId);
+        await this.zVotingHelper.checkManageCandidateAccess(ctx, election);
         await this.zVotingHelper.deleteEntity(ctx, candidate);
     }
 
