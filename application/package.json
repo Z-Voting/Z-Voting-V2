@@ -22,8 +22,8 @@
     "license": "Apache-2.0",
     "dependencies": {
         "blind-signatures": "^1.0.7",
-        "fabric-ca-client": "^2.2.4",
-        "fabric-network": "^2.2.4",
+        "fabric-ca-client": "^2.2.8",
+        "fabric-network": "^2.2.8",
         "node-rsa": "^1.1.1"
     },
     "devDependencies": {
