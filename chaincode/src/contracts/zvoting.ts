@@ -3,7 +3,7 @@ import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelp
 import {ZVotingContractHelper} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
-import {Identity} from '../types/identity';
+import {OrgIdentity} from '../types/orgIdentity';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
 import {Voter} from '../types/voter';
 import {VoterAuthRequest} from '../types/voterAuthRequest';
@@ -23,7 +23,7 @@ export class ZVotingContract extends EntityBasedContract {
     public async PublishIdentity(ctx: Context, n: string, e: string, privateKeyHash: string) {
         await this.zVotingHelper.checkPublishIdentityAccess(ctx, n, e, privateKeyHash);
 
-        const identity = new Identity(getSubmittingUserOrg(ctx), n, e);
+        const identity = new OrgIdentity(getSubmittingUserOrg(ctx), n, e);
         await this.zVotingHelper.saveEntity(ctx, identity);
     }
 
@@ -32,13 +32,13 @@ export class ZVotingContract extends EntityBasedContract {
         await this.zVotingHelper.checkDeleteIdentityAccess(ctx);
 
         const org = ctx.clientIdentity.getMSPID();
-        const identity = JSON.parse(await this.zVotingHelper.readEntity(ctx, `identity_${org}`));
+        const identity = JSON.parse(await this.zVotingHelper.readEntity(ctx, `orgIdentity_${org}`));
         await this.zVotingHelper.deleteEntity(ctx, identity);
     }
 
     @Transaction(false)
     public async FetchIdentity(ctx: Context, org: string) {
-        return (await ctx.stub.getState(`identity_${org}`)).toString();
+        return (await ctx.stub.getState(`orgIdentity_${org}`)).toString();
     }
 
     // CreateElection creates a new election

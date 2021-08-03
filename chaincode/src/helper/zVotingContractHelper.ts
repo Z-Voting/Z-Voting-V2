@@ -58,7 +58,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
     }
 
     public async checkAddJudgeProposalAccess(ctx: Context, election: Election) {
-        const identityId = `identity_${getSubmittingUserOrg(ctx)}`;
+        const identityId = `orgIdentity_${getSubmittingUserOrg(ctx)}`;
         if (!(await this.entityExists(ctx, identityId))) {
             throw new Error(`Your organization hasn't published its public key yet.`);
         }

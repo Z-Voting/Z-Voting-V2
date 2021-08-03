@@ -1,7 +1,7 @@
 import {Object, Property} from 'fabric-contract-api';
 
 @Object()
-export class Identity {
+export class OrgIdentity {
     @Property()
     public DocType: string;
 
@@ -18,8 +18,8 @@ export class Identity {
     public E: string;
 
     constructor(Org: string, N: string, E: string) {
-        this.DocType = 'identity';
-        this.ID = `identity_${Org}`;
+        this.DocType = 'orgIdentity';
+        this.ID = `orgIdentity_${Org}`;
 
         this.Org = Org;
         this.N = N;
