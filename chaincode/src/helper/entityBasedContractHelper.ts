@@ -23,10 +23,10 @@ export class EntityBasedContractHelper {
     public async saveEntity(ctx: Context, entity: IEntity): Promise<void> {
         const id = entity.ID;
 
-        // const exists = await this.EntityExists(ctx, id);
-        // if (exists) {
-        //     throw new Error(`The entity with id: ${id} already exists`);
-        // }
+        const exists = await this.entityExists(ctx, id);
+        if (exists) {
+            throw new Error(`The entity with id: ${id} already exists`);
+        }
 
         return ctx.stub.putState(id, Buffer.from(JSON.stringify(entity)));
     }

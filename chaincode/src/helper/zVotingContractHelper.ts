@@ -117,6 +117,11 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
     }
 
     public async checkPublishIdentityAccess(ctx: Context, n: string, e: string, privateKeyHash: string) {
+        const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
+        if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
+            throw new Error(`You must be an admin to publish identity`);
+        }
+
         if (ctx.stub.getMspID() === ctx.clientIdentity.getMSPID()) {
             const privateKey = await this.getImplicitPrivateData(ctx, `privateKey_${getSubmittingUserOrg(ctx)}`);
 
@@ -140,11 +145,9 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
                 throw new Error(`Hash Mismatch: ${base64Hash} \n ${privateKeyHash}`);
             }
         }
+    }
 
-        // if (await this.EntityExists(ctx, `identity_${getSubmittingUserOrg(ctx)}`)) {
-        //     throw new Error(`Your organization has already published identity`);
-        // }
-
+    public async checkDeleteIdentityAccess(ctx: Context) {
         const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
         if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
             throw new Error(`You must be an admin to publish identity`);
@@ -246,6 +249,30 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
         if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
             throw new Error(`You must be an admin to add voter`);
+        }
+    }
+
+    public async checkSubmitAuthRequestAccess(ctx: Context, election: Election) {
+        if (ctx.clientIdentity.getAttributeValue('email') === null) {
+            throw new Error(`User email is not set`);
+        }
+
+        if (!ctx.clientIdentity.assertAttributeValue('election.voter', 'true')) {
+            throw new Error(`Voter role is not set for user`);
+        }
+
+        const email = ctx.clientIdentity.getAttributeValue('email')!;
+
+        const query: any = {};
+        query.selector = {};
+
+        query.selector.DocType = 'voter';
+        query.selector.Email = email;
+        query.selector.ElectionId = election.ID;
+
+        const voterExists = await this.queryResultExists(ctx, JSON.stringify(query));
+        if (!voterExists) {
+            throw new Error('Voter does not exist');
         }
     }
 }

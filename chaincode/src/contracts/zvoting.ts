@@ -6,6 +6,7 @@ import {Election, ElectionStatus} from '../types/election';
 import {Identity} from '../types/identity';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
 import {Voter} from '../types/voter';
+import {VoterAuthRequest} from '../types/voterAuthRequest';
 import {EntityBasedContract} from './entityBasedContract';
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
@@ -24,6 +25,15 @@ export class ZVotingContract extends EntityBasedContract {
 
         const identity = new Identity(getSubmittingUserOrg(ctx), n, e);
         await this.zVotingHelper.saveEntity(ctx, identity);
+    }
+
+    @Transaction()
+    public async DeleteIdentity(ctx: Context) {
+        await this.zVotingHelper.checkDeleteIdentityAccess(ctx);
+
+        const org = ctx.clientIdentity.getMSPID();
+        const identity = JSON.parse(await this.zVotingHelper.readEntity(ctx, `identity_${org}`));
+        await this.zVotingHelper.deleteEntity(ctx, identity);
     }
 
     @Transaction(false)
@@ -195,6 +205,19 @@ export class ZVotingContract extends EntityBasedContract {
 
         election.Status = ElectionStatus.READY;
         await this.zVotingHelper.updateEntity(ctx, election);
+    }
+
+    @Transaction()
+    public async SubmitVoterAuthRequest(ctx: Context, electionId: string, authRequestData: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        await this.zVotingHelper.checkSubmitAuthRequestAccess(ctx, election);
+
+        const email = ctx.clientIdentity.getAttributeValue('email')!;
+
+        const authRequest = new VoterAuthRequest(email, electionId, authRequestData);
+        await this.zVotingHelper.saveEntity(ctx, authRequest);
     }
 
     // StartElection starts an election if it is ready

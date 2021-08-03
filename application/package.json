@@ -21,9 +21,12 @@
     "author": "Hyperledger",
     "license": "Apache-2.0",
     "dependencies": {
+        "@types/jsbn": "^1.2.29",
+        "@types/node-rsa": "^1.1.1",
         "blind-signatures": "^1.0.7",
         "fabric-ca-client": "^2.2.8",
         "fabric-network": "^2.2.8",
+        "jsbn": "^1.1.0",
         "node-rsa": "^1.1.1"
     },
     "devDependencies": {
