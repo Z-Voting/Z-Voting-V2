@@ -1,13 +1,18 @@
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
+import {BigInteger} from 'jsbn';
 import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
 import {ZVotingContractHelper} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
-import {OrgIdentity} from '../types/orgIdentity';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
+import {OrgIdentity} from '../types/orgIdentity';
 import {Voter} from '../types/voter';
+import {VoterAuthorization} from '../types/voterAuthorization';
 import {VoterAuthRequest} from '../types/voterAuthRequest';
 import {EntityBasedContract} from './entityBasedContract';
+
+// tslint:disable-next-line:no-var-requires
+const BlindSignature = require('blind-signatures');
 
 @Info({title: 'Z-Voting V2', description: 'Smart contract for Z-Voting V2'})
 export class ZVotingContract extends EntityBasedContract {
@@ -17,6 +22,18 @@ export class ZVotingContract extends EntityBasedContract {
     constructor(name: string) {
         super(name);
         this.zVotingHelper = new ZVotingContractHelper();
+    }
+
+    @Transaction()
+    public async SaveOrgPrivateKey(ctx: Context) {
+        const key = `privateKey_${ctx.clientIdentity.getMSPID()}`;
+        await this.SaveImplicitPrivateData(ctx, key);
+    }
+
+    @Transaction(false)
+    public async GetOrgPrivateKey(ctx: Context) {
+        const key = `privateKey_${ctx.clientIdentity.getMSPID()}`;
+        return this.GetImplicitPrivateData(ctx, key);
     }
 
     @Transaction()
@@ -32,12 +49,12 @@ export class ZVotingContract extends EntityBasedContract {
         await this.zVotingHelper.checkDeleteIdentityAccess(ctx);
 
         const org = ctx.clientIdentity.getMSPID();
-        const identity = JSON.parse(await this.zVotingHelper.readEntity(ctx, `orgIdentity_${org}`));
+        const identity = JSON.parse(await this.zVotingHelper.readEntityData(ctx, `orgIdentity_${org}`));
         await this.zVotingHelper.deleteEntity(ctx, identity);
     }
 
     @Transaction(false)
-    public async FetchIdentity(ctx: Context, org: string) {
+    public async FetchOrgIdentity(ctx: Context, org: string) {
         return (await ctx.stub.getState(`orgIdentity_${org}`)).toString();
     }
 
@@ -89,7 +106,7 @@ export class ZVotingContract extends EntityBasedContract {
         electionId = this.zVotingHelper.formatElectionId(electionId);
 
         const election = await this.FindElection(ctx, electionId);
-        const candidate = JSON.parse(await this.zVotingHelper.readEntity(ctx, candidateId)) as Candidate;
+        const candidate = JSON.parse(await this.zVotingHelper.readEntityData(ctx, candidateId)) as Candidate;
 
         await this.zVotingHelper.checkManageCandidateAccess(ctx, election);
         await this.zVotingHelper.deleteEntity(ctx, candidate);
@@ -127,7 +144,7 @@ export class ZVotingContract extends EntityBasedContract {
     // DeclineJudgeProposal declines a judge proposal to the election
     @Transaction()
     public async DeclineJudgeProposal(ctx: Context, judgeProposalId: string): Promise<void> {
-        const judgeProposal = JSON.parse(await this.zVotingHelper.readEntity(ctx, judgeProposalId)) as JudgeProposal;
+        const judgeProposal = JSON.parse(await this.zVotingHelper.readEntityData(ctx, judgeProposalId)) as JudgeProposal;
         const election = await this.FindElection(ctx, judgeProposal.ElectionId);
 
         await this.zVotingHelper.checkJudgeProposalManagementAccess(ctx, judgeProposal, election);
@@ -139,7 +156,7 @@ export class ZVotingContract extends EntityBasedContract {
     // ApproveJudgeProposal declines a judge proposal to the election
     @Transaction()
     public async ApproveJudgeProposal(ctx: Context, judgeProposalId: string): Promise<void> {
-        const judgeProposal = JSON.parse(await this.zVotingHelper.readEntity(ctx, judgeProposalId)) as JudgeProposal;
+        const judgeProposal = JSON.parse(await this.zVotingHelper.readEntityData(ctx, judgeProposalId)) as JudgeProposal;
         const election = await this.FindElection(ctx, judgeProposal.ElectionId);
 
         await this.zVotingHelper.checkJudgeProposalManagementAccess(ctx, judgeProposal, election);
@@ -207,19 +224,6 @@ export class ZVotingContract extends EntityBasedContract {
         await this.zVotingHelper.updateEntity(ctx, election);
     }
 
-    @Transaction()
-    public async SubmitVoterAuthRequest(ctx: Context, electionId: string, authRequestData: string) {
-        electionId = this.zVotingHelper.formatElectionId(electionId);
-        const election = await this.FindElection(ctx, electionId);
-
-        await this.zVotingHelper.checkSubmitAuthRequestAccess(ctx, election);
-
-        const email = ctx.clientIdentity.getAttributeValue('email')!;
-
-        const authRequest = new VoterAuthRequest(email, electionId, authRequestData);
-        await this.zVotingHelper.saveEntity(ctx, authRequest);
-    }
-
     // StartElection starts an election if it is ready
     @Transaction()
     public async StartElection(ctx: Context, electionId: string): Promise<void> {
@@ -230,6 +234,42 @@ export class ZVotingContract extends EntityBasedContract {
 
         election.Status = ElectionStatus.RUNNING;
         await this.zVotingHelper.updateEntity(ctx, election);
+    }
+
+    @Transaction()
+    public async SubmitVoterAuthorizationRequest(ctx: Context, electionId: string, authRequestData: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        await this.zVotingHelper.checkAuthRequestAccess(ctx, election);
+
+        const email = ctx.clientIdentity.getAttributeValue('email')!;
+
+        const authRequest = new VoterAuthRequest(email, electionId, authRequestData);
+        await this.zVotingHelper.saveEntity(ctx, authRequest);
+    }
+
+    @Transaction()
+    public async GetVoterAuthorization(ctx: Context, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        await this.zVotingHelper.checkAuthRequestAccess(ctx, election);
+
+        const email = ctx.clientIdentity.getAttributeValue('email')!;
+        const authRequestId = `voterAuthRequest_${electionId}_${email}`;
+        const authRequest = await this.zVotingHelper.findEntity<VoterAuthRequest>(ctx, authRequestId);
+
+        const authRequestData = new BigInteger(authRequest.AuthRequestData);
+
+        const orgPrivateKey = await this.zVotingHelper.getPrivateKey(ctx);
+
+        const signedVoterAuthorization = BlindSignature.sign({
+            blinded: authRequestData,
+            key: orgPrivateKey,
+        }) as BigInteger;
+
+        return new VoterAuthorization(ctx.stub.getMspID(), signedVoterAuthorization.toString());
     }
 
     @Transaction(false)

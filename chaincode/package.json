@@ -23,6 +23,7 @@
     "dependencies": {
         "@types/jsbn": "^1.2.29",
         "@types/node-rsa": "^1.1.0",
+        "blind-signatures": "^1.0.7",
         "fabric-contract-api": "^2.0.0",
         "fabric-shim": "^2.0.0",
         "jsbn": "^1.1.0",

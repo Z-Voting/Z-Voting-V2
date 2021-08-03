@@ -1,13 +1,15 @@
 import crypto = require('crypto');
-import {Gateway, GatewayOptions} from 'fabric-network';
-import {BigInteger} from 'jsbn';
+import { Gateway, GatewayOptions } from 'fabric-network';
+import { BigInteger } from 'jsbn';
 import NodeRSA from 'node-rsa';
 import * as path from 'path';
-import {JudgeProposal} from './types/judgeProposal';
-import {OrgIdentity} from './types/orgIdentity';
-import {buildCCPOrg1, buildWallet} from './utils/AppUtil';
-import {buildCAClient, enrollAdmin, registerAndEnrollUser} from './utils/CAUtil';
+import { JudgeProposal } from './types/judgeProposal';
+import { OrgIdentity } from './types/orgIdentity';
+import { VoterAuthorization } from './types/voterAuthorization';
+import { buildCCPOrg1, buildWallet } from './utils/AppUtil';
+import { buildCAClient, enrollAdmin, registerAndEnrollUser } from './utils/CAUtil';
 
+// tslint:disable-next-line:no-var-requires
 const BlindSignature = require('blind-signatures');
 
 const channelName = 'zvoting';
@@ -34,11 +36,11 @@ async function main() {
         // in a real application this would be done only when a new user was required to be added
         // and would be part of an administrative flow
         await registerAndEnrollUser(caClient, wallet, orgMsp, org1UserId, 'org1.department1', [
-            {name: `${orgMsp}.admin`, value: 'true', ecert: true},
-            {name: 'election.judge', value: 'true', ecert: true},
-            {name: 'election.creator', value: 'true', ecert: true},
-            {name: 'election.voter', value: 'true', ecert: true},
-            {name: 'email', value: `admin@${orgMsp}.com`, ecert: true},
+            { name: `${orgMsp}.admin`, value: 'true', ecert: true },
+            { name: 'election.judge', value: 'true', ecert: true },
+            { name: 'election.creator', value: 'true', ecert: true },
+            { name: 'election.voter', value: 'true', ecert: true },
+            { name: 'email', value: `admin@${orgMsp}.com`, ecert: true },
         ]);
 
         // Create a new gateway instance for interacting with the fabric network.
@@ -49,7 +51,7 @@ async function main() {
         const gatewayOpts: GatewayOptions = {
             wallet,
             identity: org1UserId,
-            discovery: {enabled: true, asLocalhost: true}, // using asLocalhost as this gateway is using a fabric network deployed locally
+            discovery: { enabled: true, asLocalhost: true }, // using asLocalhost as this gateway is using a fabric network deployed locally
         };
 
         try {
@@ -91,7 +93,7 @@ async function main() {
 
             // Publish OrgIdentity
             try {
-                key = BlindSignature.keyGeneration({b: 2048});
+                key = BlindSignature.keyGeneration({ b: 2048 });
 
                 const privateKey = key.exportKey('pkcs8').toString();
                 console.log('\n');
@@ -117,22 +119,22 @@ async function main() {
 
                 // Save Private Key
                 try {
-                    console.log('\n--> Submit Transaction: saveImplicitPrivateData (Private Key)');
-                    await contract.createTransaction('SaveImplicitPrivateData')
+                    console.log('\n--> Submit Transaction: SaveOrgPrivateKey');
+                    await contract.createTransaction('SaveOrgPrivateKey')
                         .setTransient({
                             data: Buffer.from(privateKey),
                         })
                         .setEndorsingOrganizations(orgMsp)
-                        .submit(collectionKey);
-                    console.log('*** Result: saveImplicitPrivateData succeeded');
+                        .submit();
+                    console.log('*** Result: SaveOrgPrivateKey succeeded');
                 } catch (e) {
                     console.error(e.toString());
                 }
 
                 // Fetch Private Key
                 try {
-                    console.log('\n--> Evaluate Transaction: GetImplicitPrivateData');
-                    result = await contract.evaluateTransaction('GetImplicitPrivateData', collectionKey);
+                    console.log('\n--> Evaluate Transaction: GetOrgPrivateKey');
+                    result = await contract.evaluateTransaction('GetOrgPrivateKey');
                     console.log(`*** Result: ${result}`);
                 } catch (e) {
                     console.error(e.toString());
@@ -142,8 +144,8 @@ async function main() {
                 await contract.submitTransaction('PublishIdentity', n, e, crypto.createHash('sha256').update(Buffer.from(privateKey)).digest('base64'));
                 console.log('*** Result: OrgIdentity Published');
 
-                console.log('\n--> Evaluate Transaction: FetchIdentity');
-                result = await contract.evaluateTransaction('FetchIdentity', orgMsp);
+                console.log('\n--> Evaluate Transaction: FetchOrgIdentity');
+                result = await contract.evaluateTransaction('FetchOrgIdentity', orgMsp);
                 console.log(`*** Result: ${result}`);
 
             } catch (e) {
@@ -286,24 +288,19 @@ async function main() {
                 });
             }
 
-            // SEND BLIND AUTHORIZATION REQUEST
+            // BLIND VOTER AUTHORIZATION
             try {
-                console.log(`\n--> Submit Transaction: SubmitVoterAuthRequest`);
+                console.log(`\n--> Submit Transaction: SubmitVoterAuthorizationRequest`);
 
                 const judges = JSON.parse((await contract.evaluateTransaction('GetJudges', `${electionId}`)).toString()) as JudgeProposal[];
                 const judgeIdentities = new Map<string, OrgIdentity>();
+                const judgePubKeys = new Map<string, NodeRSA>();
                 const judgeBlindingR = new Map<string, BigInteger>();
 
                 for (const judge of judges) {
-                    const judgeIdentity = JSON.parse((await contract.evaluateTransaction('FetchIdentity', judge.Org)).toString()) as OrgIdentity;
+                    const judgeIdentity = JSON.parse((await contract.evaluateTransaction('FetchOrgIdentity', judge.Org)).toString()) as OrgIdentity;
                     judgeIdentities.set(judge.Org, judgeIdentity);
-                }
 
-                const randomUUID = await getRandomString(32);
-                console.log('Random UUID: ', randomUUID);
-
-                for (const judge of judges) {
-                    const judgeIdentity = judgeIdentities.get(judge.Org);
                     const N = judgeIdentity.N;
                     const E = judgeIdentity.E;
 
@@ -315,11 +312,23 @@ async function main() {
                         e: Number(E),
                     }, 'components-public');
 
-                    const {blinded, r} = BlindSignature.blind({
+                    judgePubKeys.set(judge.Org, judgePubKey);
+                }
+
+                const randomUUID = await getRandomString(32);
+                console.log('Random UUID: ', randomUUID);
+
+                for (const judge of judges) {
+                    const judgeIdentity = judgeIdentities.get(judge.Org);
+                    const N = judgeIdentity.N;
+                    const E = judgeIdentity.E;
+
+
+                    const { blinded, r } = BlindSignature.blind({
                         message: randomUUID,
                         N,
                         E,
-                    }) as {blinded: BigInteger, r: BigInteger};
+                    }) as { blinded: BigInteger, r: BigInteger };
 
                     judgeBlindingR.set(judge.Org, r);
 
@@ -327,10 +336,35 @@ async function main() {
                     const blindedMessage = blinded.toString();
                     console.log('Blinded Message\n', blindedMessage);
 
-                    await contract.submitTransaction('SubmitVoterAuthRequest', `election${electionId}`, blindedMessage);
-                    console.log(`*** Result: SubmitVoterAuthRequest Succeeded`);
+                    await contract.submitTransaction('SubmitVoterAuthorizationRequest', `election${electionId}`, blindedMessage);
+                    console.log(`*** Result: SubmitVoterAuthorizationRequest Succeeded`);
 
                     ////////////////////////////////////////////////
+                }
+
+                for (const judge of judges) {
+                    console.log('\n--> Evaluate Transaction: GetVoterAuthorization');
+                    const voterAuthorizationData = await contract.evaluateTransaction('GetVoterAuthorization', `election${electionId}`);
+                    const voterAuthorization = JSON.parse(voterAuthorizationData.toString()) as VoterAuthorization;
+
+                    const unblindedAuthorization = BlindSignature.unblind({
+                        signed: new BigInteger(voterAuthorization.AuthorizationData),
+                        N: judgeIdentities.get(judge.Org).N,
+                        r: judgeBlindingR.get(judge.Org),
+                    }) as BigInteger;
+
+                    const signVerified = BlindSignature.verify({
+                        unblinded: unblindedAuthorization,
+                        N: judgeIdentities.get(judge.Org).N,
+                        E: judgeIdentities.get(judge.Org).E,
+                        message: randomUUID,
+                    });
+
+                    if (signVerified) {
+                        console.log(`${voterAuthorization.Org}: Signatures verified!`);
+                    } else {
+                        console.log(`${voterAuthorization.Org}: Invalid signature`);
+                    }
                 }
 
             } catch (e) {

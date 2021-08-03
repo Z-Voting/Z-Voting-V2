@@ -252,7 +252,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         }
     }
 
-    public async checkSubmitAuthRequestAccess(ctx: Context, election: Election) {
+    public async checkAuthRequestAccess(ctx: Context, election: Election) {
         if (ctx.clientIdentity.getAttributeValue('email') === null) {
             throw new Error(`User email is not set`);
         }
@@ -274,5 +274,12 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         if (!voterExists) {
             throw new Error('Voter does not exist');
         }
+    }
+
+    public async getPrivateKey(ctx: Context) {
+        const collectionKey = `privateKey_${ctx.stub.getMspID()}`;
+        const privateKeyPem = await this.getImplicitPrivateData(ctx, collectionKey);
+
+        return new NodeRSA(privateKeyPem);
     }
 }

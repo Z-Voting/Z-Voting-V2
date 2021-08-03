@@ -58,7 +58,7 @@ export class EntityBasedContract extends Contract {
     @Transaction(false)
     @Returns('string')
     public async ReadEntity(ctx: Context, id: string): Promise<string> {
-        return this.entityHelper.readEntity(ctx, id);
+        return this.entityHelper.readEntityData(ctx, id);
     }
 
     // DeleteEntity deletes an existing entity from the world state.

@@ -5,13 +5,18 @@ import {getImplicitPrivateCollection} from './contractHelper';
 
 export class EntityBasedContractHelper {
 
-    public async readEntity(ctx: Context, id: string) {
+    public async readEntityData(ctx: Context, id: string) {
         const entityJSON = await ctx.stub.getState(id);
 
         if (!entityJSON || entityJSON.length === 0) {
             throw new Error(`The entity with id: ${id} does not exist`);
         }
         return entityJSON.toString();
+    }
+
+    public async findEntity<Type>(ctx: Context, id: string): Promise<Type> {
+        const entityJSON = await this.readEntityData(ctx, id);
+        return JSON.parse(entityJSON) as Type;
     }
 
     public async entityExists(ctx: Context, id: string) {
