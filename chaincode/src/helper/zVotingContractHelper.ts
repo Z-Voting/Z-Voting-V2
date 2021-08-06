@@ -2,8 +2,9 @@ import {Context} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
 import NodeRSA from 'node-rsa';
 import {Election, ElectionStatus} from '../types/election';
-import {OrgVoteParts} from '../types/electionMetadata';
 import {JudgeProposal} from '../types/judgeProposal';
+import {OrgVotePartList} from '../types/orgVotePartList';
+import {Voter} from '../types/voter';
 import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from './contractHelper';
 import {EntityBasedContractHelper} from './entityBasedContractHelper';
 
@@ -229,7 +230,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             });
 
             return Array.from(votePartsPerJudge.keys())
-                .map((org) => new OrgVoteParts(org, votePartsPerJudge.get(org)!));
+                .map((org) => new OrgVotePartList(org, votePartsPerJudge.get(org)!));
         }
 
         const votePartCopies = judgeCount - trustThreshold + 1;
@@ -281,5 +282,21 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         const privateKeyPem = await this.getImplicitPrivateData(ctx, collectionKey);
 
         return new NodeRSA(privateKeyPem);
+    }
+
+    public async getVoters(ctx: Context, election: Election) {
+        const query: any = {};
+        query.selector = {};
+
+        query.selector.DocType = 'voter';
+        query.selector.ElectionId = election.ID;
+
+        const votersData = await this.queryLedger(ctx, JSON.stringify(query));
+
+        console.log('------------------');
+        console.log(votersData);
+        console.log('------------------');
+
+        return JSON.parse(votersData) as Voter[];
     }
 }

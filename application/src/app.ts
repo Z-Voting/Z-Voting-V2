@@ -1,13 +1,16 @@
 import crypto = require('crypto');
-import { Gateway, GatewayOptions } from 'fabric-network';
-import { BigInteger } from 'jsbn';
+import {Gateway, GatewayOptions} from 'fabric-network';
+import {BigInteger} from 'jsbn';
 import NodeRSA from 'node-rsa';
 import * as path from 'path';
-import { JudgeProposal } from './types/judgeProposal';
-import { OrgIdentity } from './types/orgIdentity';
-import { VoterAuthorization } from './types/voterAuthorization';
-import { buildCCPOrg1, buildWallet } from './utils/AppUtil';
-import { buildCAClient, enrollAdmin, registerAndEnrollUser } from './utils/CAUtil';
+import {Candidate} from './types/candidate';
+import {Election} from './types/election';
+import {JudgeProposal} from './types/judgeProposal';
+import {OrgIdentity} from './types/orgIdentity';
+import {VotePart} from './types/votePart';
+import {VoterAuthorization} from './types/voterAuthorization';
+import {buildCCPOrg1, buildWallet} from './utils/AppUtil';
+import {buildCAClient, enrollAdmin, registerAndEnrollUser} from './utils/CAUtil';
 
 // tslint:disable-next-line:no-var-requires
 const BlindSignature = require('blind-signatures');
@@ -36,11 +39,11 @@ async function main() {
         // in a real application this would be done only when a new user was required to be added
         // and would be part of an administrative flow
         await registerAndEnrollUser(caClient, wallet, orgMsp, org1UserId, 'org1.department1', [
-            { name: `${orgMsp}.admin`, value: 'true', ecert: true },
-            { name: 'election.judge', value: 'true', ecert: true },
-            { name: 'election.creator', value: 'true', ecert: true },
-            { name: 'election.voter', value: 'true', ecert: true },
-            { name: 'email', value: `admin@${orgMsp}.com`, ecert: true },
+            {name: `${orgMsp}.admin`, value: 'true', ecert: true},
+            {name: 'election.judge', value: 'true', ecert: true},
+            {name: 'election.creator', value: 'true', ecert: true},
+            {name: 'election.voter', value: 'true', ecert: true},
+            {name: 'email', value: `admin@${orgMsp}.com`, ecert: true},
         ]);
 
         // Create a new gateway instance for interacting with the fabric network.
@@ -51,7 +54,7 @@ async function main() {
         const gatewayOpts: GatewayOptions = {
             wallet,
             identity: org1UserId,
-            discovery: { enabled: true, asLocalhost: true }, // using asLocalhost as this gateway is using a fabric network deployed locally
+            discovery: {enabled: true, asLocalhost: true}, // using asLocalhost as this gateway is using a fabric network deployed locally
         };
 
         try {
@@ -89,11 +92,11 @@ async function main() {
                 console.error(e.toString());
             }
 
-            let key = null;
+            let key: any = null;
 
             // Publish OrgIdentity
             try {
-                key = BlindSignature.keyGeneration({ b: 2048 });
+                key = BlindSignature.keyGeneration({b: 2048});
 
                 const privateKey = key.exportKey('pkcs8').toString();
                 console.log('\n');
@@ -105,7 +108,7 @@ async function main() {
 
                 // console.log(key.keyPair);
 
-                const collectionKey = `privateKey_${orgMsp}`;
+                // const collectionKey = `privateKey_${orgMsp}`;
 
                 // Get Private Endorsement Right
                 // try {
@@ -323,8 +326,7 @@ async function main() {
                     const N = judgeIdentity.N;
                     const E = judgeIdentity.E;
 
-
-                    const { blinded, r } = BlindSignature.blind({
+                    const {blinded, r} = BlindSignature.blind({
                         message: randomUUID,
                         N,
                         E,
@@ -385,6 +387,109 @@ async function main() {
                 console.log('\n--> Evaluate Transaction: GetElections');
                 result = await contract.evaluateTransaction('GetElections');
                 console.log(`*** Result: ${result}`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            async function getCandidates(election: Election) {
+                const candidatesData = await contract.evaluateTransaction('GetCandidates', `${election.ID}`);
+                return JSON.parse(candidatesData.toString()) as Candidate[];
+            }
+
+            async function generateVotePartsForCandidate(candidateIdx: number, candidate: Candidate, election: Election, candidates: Candidate[]): Promise<VotePart[]> {
+                const voteUUID = await getRandomString(12);
+                const votePartCount = 3; // election.Metadata.VotePartCount;
+
+                let lastVotePartData = new Array<number>(candidates.length).fill(0);
+                lastVotePartData[candidateIdx] = 1;
+
+                const voteParts: VotePart[] = [];
+
+                for (let votePartNumber = 1; votePartNumber <= votePartCount - 1; votePartNumber++) {
+                    const votePartData = Array.from({length: candidates.length}, () => Math.floor(Math.random() * election.Metadata.N));
+                    // console.log(`${votePartNumber} => ${votePartData}`);
+
+                    const votePart = new VotePart(voteUUID, votePartNumber, votePartData);
+                    votePart.CandidateUniqueId = candidate.UniqueId;
+                    voteParts.push(votePart);
+
+                    lastVotePartData = lastVotePartData.map((score, i) => score - votePartData[i]);
+                }
+
+                const mod = election.Metadata.N;
+                lastVotePartData = lastVotePartData.map((score) => ((score % mod) + mod) % mod);
+                const lastVotePart = new VotePart(voteUUID, votePartCount, lastVotePartData);
+                lastVotePart.CandidateUniqueId = candidate.UniqueId;
+                voteParts.push(lastVotePart);
+
+                return voteParts;
+            }
+
+            function verifyVotePartsForCandidate(election: Election, voteParts: VotePart[], candidate?: Candidate) {
+                voteParts.forEach((votePart) => {
+                    const nodeRSAKey = key as NodeRSA;
+                    votePart.verify(nodeRSAKey);
+                });
+
+                const mod = election.Metadata.N;
+                const combinedVote = voteParts
+                    .filter((votePart) => candidate === undefined || votePart.CandidateUniqueId === candidate.UniqueId)
+                    .reduce((votePart1, votePart2) => {
+                        const votePartData = votePart1.Data
+                            .map((score, i) => score + votePart2.Data[i])
+                            .map((score) => ((score % mod) + mod) % mod);
+                        return new VotePart(votePart1.VoteUUID, 0, votePartData);
+                    });
+
+                console.log(`Combined: ${JSON.stringify(combinedVote.Data)}`);
+            }
+
+            async function generateVotes(election: Election): Promise<VotePart[]> {
+                const candidates = await getCandidates(election);
+
+                let voteParts: VotePart[] = [];
+
+                for (const [idx, candidate] of candidates.entries()) {
+                    voteParts = [...voteParts, ...(await generateVotePartsForCandidate(idx, candidate, election, candidates))];
+                }
+
+                for (const votePart of voteParts) {
+                    const nodeRSAKey = key as NodeRSA;
+                    votePart.signHash(nodeRSAKey);
+                }
+
+                return voteParts;
+            }
+
+            // Get Current Election and Cast Vote
+            try {
+                console.log('\n--> Evaluate Transaction: GetElection');
+                const electionData = await contract.evaluateTransaction('GetElection', `${electionId}`);
+                const election = JSON.parse(electionData.toString()) as Election;
+
+                console.log(`Current Election:\n${JSON.stringify(election, null, 2)}`);
+
+                const candidates = await getCandidates(election);
+                console.log(`candidate count: ${candidates.length}`);
+
+                const voteParts = await generateVotes(election);
+                const chosenCandidate = candidates[0];
+
+                const chosenVoteParts = voteParts
+                    .filter((votePart) => votePart.CandidateUniqueId === chosenCandidate.UniqueId)
+                    .map((votePart) => {
+                        votePart.CandidateUniqueId = null;
+                        return votePart;
+                    });
+
+                console.log(chosenCandidate.Name);
+                verifyVotePartsForCandidate(election, chosenVoteParts);
+
+                const votePartPerNumber = new Map<number, VotePart>();
+                chosenVoteParts.forEach((votePart) => votePartPerNumber.set(votePart.VotePartNumber, votePart));
+
+                console.log(votePartPerNumber);
+
             } catch (e) {
                 console.error(e.toString());
             }

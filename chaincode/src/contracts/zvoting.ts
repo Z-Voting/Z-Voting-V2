@@ -217,6 +217,7 @@ export class ZVotingContract extends EntityBasedContract {
         election.Metadata.Judges = judges;
         election.Metadata.TrustThreshold = trustThreshold;
         election.Metadata.JudgeCount = judges.length;
+        election.Metadata.N = 1000000007;
 
         this.zVotingHelper.calculateDistributionScheme(election);
 
@@ -270,6 +271,13 @@ export class ZVotingContract extends EntityBasedContract {
         }) as BigInteger;
 
         return new VoterAuthorization(ctx.stub.getMspID(), signedVoterAuthorization.toString());
+    }
+
+    @Transaction(false)
+    public async GetElection(ctx: Context, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+
+        return await this.zVotingHelper.readEntityData(ctx, electionId);
     }
 
     @Transaction(false)
