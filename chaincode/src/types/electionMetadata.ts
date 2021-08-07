@@ -4,6 +4,10 @@ import {OrgVotePartList} from './orgVotePartList';
 
 @Object()
 export class ElectionMetadata {
+
+    @Property()
+    public VoteGeneratorPublicKey?: string;
+
     @Property('Judges', 'JudgeProposal[]')
     public Judges?: JudgeProposal[];
 

@@ -2,11 +2,17 @@ import {Context} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
 import NodeRSA from 'node-rsa';
 import {Election, ElectionStatus} from '../types/election';
+import {EncryptedVotePartEntry} from '../types/encryptedVotePartEntry';
 import {JudgeProposal} from '../types/judgeProposal';
+import {OrgIdentity} from '../types/orgIdentity';
 import {OrgVotePartList} from '../types/orgVotePartList';
+import {Vote} from '../types/vote';
 import {Voter} from '../types/voter';
 import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from './contractHelper';
 import {EntityBasedContractHelper} from './entityBasedContractHelper';
+
+// tslint:disable-next-line:no-var-requires
+const BlindSignature = require('blind-signatures');
 
 export class ZVotingContractHelper extends EntityBasedContractHelper {
 
@@ -168,6 +174,10 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         if (election.Status !== ElectionStatus.PENDING) {
             throw new Error(`The election with id: ${election.ID} must be in PENDING state to mark as ready, current state is ${election.Status}`);
         }
+
+        if (election.Metadata.VoteGeneratorPublicKey === null) {
+            throw new Error(`The election with id: ${election.ID} does not have any Vote Generator yet`);
+        }
     }
 
     public calculateDistributionScheme(election: Election) {
@@ -298,5 +308,130 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         console.log('------------------');
 
         return JSON.parse(votersData) as Voter[];
+    }
+
+    public checkPublishVoteGeneratorPublicKeyAccess(ctx: Context, election: Election) {
+        if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
+            throw new Error(`You must have election creator role to add candidate to an election`);
+        }
+
+        const submittingUserUID = getSubmittingUserUID(ctx);
+        if (election.Owner !== submittingUserUID) {
+            throw new Error(`Only the election owner can add a candidate`);
+        }
+
+        if (election.Status !== ElectionStatus.PENDING) {
+            throw new Error(`The election with id: ${election.ID} is not accepting any more candidates`);
+        }
+
+        if (election.Metadata.VoteGeneratorPublicKey !== undefined) {
+            throw new Error(`The election with id: ${election.ID} already has a Vote Generator registered`);
+        }
+    }
+
+    public async fetchOrgIdentity(ctx: Context, org: string) {
+        const orgIdentityJSON = (await ctx.stub.getState(`orgIdentity_${org}`)).toString();
+        return JSON.parse(orgIdentityJSON) as OrgIdentity;
+    }
+
+    public async fetchJudgeIdentities(ctx: Context, election: Election) {
+        const judgeIdentities = new Map<string, OrgIdentity>();
+
+        for (const judge of election.Metadata.Judges!) {
+            const orgIdentity = await this.fetchOrgIdentity(ctx, judge.Org);
+            judgeIdentities.set(judge.Org, orgIdentity);
+        }
+
+        return judgeIdentities;
+    }
+
+    public async checkSubmitVoteAccess(ctx: Context, vote: Vote, election: Election) {
+        if (election.Status !== ElectionStatus.RUNNING) {
+            throw new Error(`Election has not started yet.`);
+        }
+    }
+
+    public async validateVote(ctx: Context, vote: Vote, election: Election, privateKey: NodeRSA) {
+        const judgeIdentities = await this.fetchJudgeIdentities(ctx, election);
+
+        vote.Authorization.Signatures.forEach(({Org, Signature}) => {
+            const signVerified = BlindSignature.verify({
+                unblinded: new BigInteger(Signature),
+                N: judgeIdentities.get(Org)!.N,
+                E: judgeIdentities.get(Org)!.E,
+                message: vote.Authorization.UUID,
+            });
+
+            if (!signVerified) {
+                throw new Error(`${Org}: Invalid signature`);
+            }
+        });
+
+        const voteGeneratorPublicKey = new NodeRSA(election.Metadata.VoteGeneratorPublicKey!);
+
+        const hashSignMatch = vote.VotePartsSignedHashes.every((votePartHashSign) => {
+            return voteGeneratorPublicKey.verify(
+                votePartHashSign.VotePartHash,
+                votePartHashSign.VotePartHashSign,
+                undefined,
+                'base64',
+            );
+        });
+
+        if (!hashSignMatch) {
+            throw new Error('Hash and sign do not match');
+        }
+
+        const orgIsJudge = election.Metadata.Judges!
+            .map((judgeProposal) => judgeProposal.Org)
+            .includes(ctx.stub.getMspID());
+
+        if (!orgIsJudge) {
+            return;
+        }
+
+        const voteParts = vote.VotePartsPerOrg
+            .filter((votePartPerOrg) => votePartPerOrg.Org === ctx.stub.getMspID())
+            .flatMap((votePartPerOrg) => votePartPerOrg.EncryptedVoteParts)
+            .map(({VotePartNumber, EncryptedVotePart}) => new EncryptedVotePartEntry(VotePartNumber, EncryptedVotePart))
+            .map((encryptedVotePartEntry) => encryptedVotePartEntry.decrypt(privateKey));
+        console.log(JSON.stringify(voteParts, null, 2));
+
+        // const voteParts = vote.VotePartsPerOrg
+        //     .filter((votePartPerOrg) => votePartPerOrg.Org === ctx.stub.getMspID())[0]
+        //     .EncryptedVoteParts
+        //     .map((encryptedVotePartEntry) => new EncryptedVotePartEntry(encryptedVotePartEntry.VotePartNumber, encryptedVotePartEntry.EncryptedVotePart))
+        //     .map((encryptedVotePartEntry) => encryptedVotePartEntry.decrypt(privateKey));
+
+        const votePartIntegrityMatch = voteParts.every((votePart) => {
+            const randomIdMatch = votePart.VoteRandomId === vote.VoteRandomId;
+
+            const votePartHash = vote.VotePartsSignedHashes
+                .find((votePartHashSign) => votePartHashSign.VotePartNumber === votePart.VotePartNumber)
+                ?.VotePartHash;
+
+            if (votePartHash === undefined) {
+                throw new Error('Signed Hash not found for vote part');
+            }
+
+            const hashMatch = votePart.generateHash() === votePartHash;
+
+            return randomIdMatch && hashMatch;
+        });
+
+        if (!votePartIntegrityMatch) {
+            throw new Error('Vote Integrity Mismatch');
+        }
+    }
+
+    public async checkSaveOrgPrivateKeyAccess(ctx: Context) {
+        if (ctx.clientIdentity.getMSPID() !== ctx.stub.getMspID()) {
+            throw new Error('The users does not belong to this organization');
+        }
+
+        const adminRole = `${ctx.stub.getMspID()}.admin`;
+        if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
+            throw new Error(`You must be an admin to save private key`);
+        }
     }
 }

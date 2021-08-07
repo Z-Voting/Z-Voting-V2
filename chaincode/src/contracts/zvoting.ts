@@ -1,11 +1,14 @@
+import assert from 'assert';
 import {Context, Info, Returns, Transaction} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
+import NodeRSA from 'node-rsa';
 import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelper';
 import {ZVotingContractHelper} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
 import {OrgIdentity} from '../types/orgIdentity';
+import {Vote} from '../types/vote';
 import {Voter} from '../types/voter';
 import {VoterAuthorization} from '../types/voterAuthorization';
 import {VoterAuthRequest} from '../types/voterAuthRequest';
@@ -18,6 +21,7 @@ const BlindSignature = require('blind-signatures');
 export class ZVotingContract extends EntityBasedContract {
 
     protected zVotingHelper: ZVotingContractHelper;
+    private ownPrivateKey?: NodeRSA;
 
     constructor(name: string) {
         super(name);
@@ -27,6 +31,12 @@ export class ZVotingContract extends EntityBasedContract {
     @Transaction()
     public async SaveOrgPrivateKey(ctx: Context) {
         const key = `privateKey_${ctx.clientIdentity.getMSPID()}`;
+
+        await this.zVotingHelper.checkSaveOrgPrivateKeyAccess(ctx);
+
+        const data = ctx.stub.getTransient().get('data')!.toString();
+        this.ownPrivateKey = new NodeRSA(data);
+
         await this.SaveImplicitPrivateData(ctx, key);
     }
 
@@ -55,7 +65,7 @@ export class ZVotingContract extends EntityBasedContract {
 
     @Transaction(false)
     public async FetchOrgIdentity(ctx: Context, org: string) {
-        return (await ctx.stub.getState(`orgIdentity_${org}`)).toString();
+        return JSON.parse((await ctx.stub.getState(`orgIdentity_${org}`)).toString());
     }
 
     // CreateElection creates a new election
@@ -129,6 +139,14 @@ export class ZVotingContract extends EntityBasedContract {
         await this.zVotingHelper.saveEntity(ctx, voter);
     }
 
+    @Transaction(false)
+    public async GetVoters(ctx: Context, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        return await this.zVotingHelper.getVoters(ctx, election);
+    }
+
     // AddJudgeProposal adds a judge proposal to the election
     @Transaction()
     public async AddJudgeProposal(ctx: Context, electionId: string): Promise<void> {
@@ -192,6 +210,21 @@ export class ZVotingContract extends EntityBasedContract {
         return await this.zVotingHelper.queryLedger(ctx, JSON.stringify(query));
     }
 
+    // Publish Vote Generator Public Key
+    @Transaction()
+    public async PublishVoteGeneratorPublicKey(ctx: Context, voteGeneratorPublicKey: string, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        this.zVotingHelper.checkPublishVoteGeneratorPublicKeyAccess(ctx, election);
+
+        const publicKey = new NodeRSA(voteGeneratorPublicKey);
+        assert(publicKey.isPublic(), new Error('Not a valid public key'));
+
+        election.Metadata.VoteGeneratorPublicKey = voteGeneratorPublicKey;
+        await this.zVotingHelper.updateEntity(ctx, election);
+    }
+
     // MarkElectionAsReady changes the election status to ready
     @Transaction()
     public async MarkElectionAsReady(ctx: Context, electionId: string, trustThreshold: number): Promise<void> {
@@ -250,7 +283,7 @@ export class ZVotingContract extends EntityBasedContract {
         await this.zVotingHelper.saveEntity(ctx, authRequest);
     }
 
-    @Transaction()
+    @Transaction(false)
     public async GetVoterAuthorization(ctx: Context, electionId: string) {
         electionId = this.zVotingHelper.formatElectionId(electionId);
         const election = await this.FindElection(ctx, electionId);
@@ -307,5 +340,20 @@ export class ZVotingContract extends EntityBasedContract {
         query.selector.ElectionId = electionId;
 
         return await this.zVotingHelper.queryLedger(ctx, JSON.stringify(query));
+    }
+
+    @Transaction()
+    public async SubmitVote(ctx: Context, voteJSON: string) {
+        const vote = JSON.parse(voteJSON) as Vote; // Vote.fromJSON(voteJSON);
+        vote.DocType = 'vote';
+        vote.ID = `vote_${vote.ElectionId}_${vote.Authorization.UUID}`;
+        vote.ElectionId = this.zVotingHelper.formatElectionId(vote.ElectionId);
+
+        const election = await this.FindElection(ctx, vote.ElectionId);
+
+        await this.zVotingHelper.checkSubmitVoteAccess(ctx, vote, election);
+        await this.zVotingHelper.validateVote(ctx, vote, election, this.ownPrivateKey!);
+
+        await this.zVotingHelper.saveEntity(ctx, vote);
     }
 }

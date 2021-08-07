@@ -1,11 +1,11 @@
 import NodeRSA from 'node-rsa';
 import {VotePart} from './votePart';
 
-export class EncryptedVotePart {
+export class EncryptedVotePartEntry {
 
     public static from(votePart: VotePart, key: NodeRSA) {
         const encryptedVotePart = key.encrypt(JSON.stringify(votePart), 'base64');
-        return new EncryptedVotePart(votePart.VotePartNumber, encryptedVotePart);
+        return new EncryptedVotePartEntry(votePart.VotePartNumber, encryptedVotePart);
     }
 
     public VotePartNumber: number;
@@ -17,6 +17,6 @@ export class EncryptedVotePart {
     }
 
     public decrypt(key: NodeRSA) {
-        return JSON.parse(key.decrypt(this.EncryptedVotePart, 'base64')) as VotePart;
+        return JSON.parse(key.decrypt(this.EncryptedVotePart, 'utf8')) as VotePart;
     }
 }

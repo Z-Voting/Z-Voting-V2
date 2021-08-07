@@ -5,7 +5,7 @@ import NodeRSA from 'node-rsa';
 import * as path from 'path';
 import {Candidate} from './types/candidate';
 import {Election} from './types/election';
-import {EncryptedVotePart} from './types/encryptedVotePart';
+import {EncryptedVotePartEntry} from './types/encryptedVotePartEntry';
 import {JudgeProposal} from './types/judgeProposal';
 import {OrgIdentity} from './types/orgIdentity';
 import {OrgSignature} from './types/orgSignature';
@@ -260,6 +260,17 @@ async function main() {
                 console.error(e.toString());
             }
 
+            // Publish Vote Generator Public Key
+            try {
+                const publicKeyPem = key.exportKey('public');
+
+                console.log(`\n--> Submit Transaction: PublishVoteGeneratorPublicKey`);
+                await contract.submitTransaction('PublishVoteGeneratorPublicKey', publicKeyPem, `election${electionId}`);
+                console.log(`*** Result: PublishVoteGeneratorPublicKey Succeeded`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
             try {
                 console.log(`\n--> Submit Transaction: MarkElectionAsReady`);
                 await contract.submitTransaction('MarkElectionAsReady', `election${electionId}`, '1');
@@ -280,6 +291,14 @@ async function main() {
                 console.log(`\n--> Submit Transaction: AddVoter`);
                 await contract.submitTransaction('AddVoter', 'AKD', 'akd@gmail.com', orgMsp, `election${electionId}`);
                 console.log(`*** Result: AddVoter Succeeded`);
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            try {
+                console.log(`\n--> Submit Transaction: GetVoters`);
+                result = await contract.evaluateTransaction('GetVoters', `election${electionId}`);
+                console.log(`*** Result: ${result}`);
             } catch (e) {
                 console.error(e.toString());
             }
@@ -547,7 +566,7 @@ async function main() {
                             } = votePartDataFromJudgePerNumber.get(votePartNumber);
 
                             const votePart = new VotePart(VoteRandomId, VotePartNumber, Data);
-                            return EncryptedVotePart.from(votePart, key);
+                            return EncryptedVotePartEntry.from(votePart, key);
                         });
 
                     return votePartForOrg;
@@ -568,14 +587,14 @@ async function main() {
                 console.log('\x1b[45m%s\x1b[0m', '\nVote:');
                 console.log(JSON.stringify(vote, null, 4));
 
-                // // Submit Vote
-                // try {
-                //     console.log('\n--> Submit Transaction: SubmitVote');
-                //     await contract.submitTransaction('SubmitVote', JSON.stringify(vote));
-                //     console.log('*** Result: Vote Submitted');
-                // } catch (e) {
-                //     console.error(e.toString());
-                // }
+                // Submit Vote
+                try {
+                    console.log('\n--> Submit Transaction: SubmitVote');
+                    await contract.submitTransaction('SubmitVote', JSON.stringify(vote));
+                    console.log('*** Result: Vote Submitted');
+                } catch (e) {
+                    console.error(e.toString());
+                }
 
             } catch (e) {
                 console.error(e.toString());
