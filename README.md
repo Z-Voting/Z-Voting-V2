@@ -94,6 +94,8 @@ Implementation for Z-Voting V2 protocol
       }
     ]
   },
+  "ElectionId": "election5117",
+  "VoteRandomId": "RANDOM_STRING()",
   "VotePartCount": 3,
   "VotePartsSignedHashes": [
     {
@@ -112,44 +114,43 @@ Implementation for Z-Voting V2 protocol
       "VotePartHashSign": "SIGN(Hash#2, VOTE_GENERATOR_PRIVKEY)"
     }
   ],
-  "VoteRandomId": "RANDOM_STRING()",
   "VotePartsPerOrg": [
     {
       "Org": "Org1MSP",
-      "VoteParts": [
+      "EncryptedVoteParts": [
         {
           "VotePartNumber": 1,
-          "VotePartData": "ENCRYPT(PART1_DATA, Org1MSP_PUBKEY)"
+          "EncryptedVotePart": "ENCRYPT(PART1_DATA, Org1MSP_PUBKEY)"
         },
         {
           "VotePartNumber": 2,
-          "VotePartData": "ENCRYPT(PART2_DATA, Org1MSP_PUBKEY)"
+          "EncryptedVotePart": "ENCRYPT(PART2_DATA, Org1MSP_PUBKEY)"
         }
       ]
     },
     {
       "Org": "Org2MSP",
-      "VoteParts": [
+      "EncryptedVoteParts": [
         {
           "VotePartNumber": 0,
-          "VotePartData": "ENCRYPT(PART0_DATA, Org2MSP_PUBKEY)"
+          "EncryptedVotePart": "ENCRYPT(PART0_DATA, Org2MSP_PUBKEY)"
         },
         {
           "VotePartNumber": 2,
-          "VotePartData": "ENCRYPT(PART2_DATA, Org2MSP_PUBKEY)"
+          "EncryptedVotePart": "ENCRYPT(PART2_DATA, Org2MSP_PUBKEY)"
         }
       ]
     },
     {
       "Org": "Org3MSP",
-      "VoteParts": [
+      "EncryptedVoteParts": [
         {
           "VotePartNumber": 0,
-          "VotePartData": "ENCRYPT(PART0_DATA, Org3MSP_PUBKEY)"
+          "EncryptedVotePart": "ENCRYPT(PART0_DATA, Org3MSP_PUBKEY)"
         },
         {
           "VotePartNumber": 1,
-          "VotePartData": "ENCRYPT(PART1_DATA, Org3MSP_PUBKEY)"
+          "EncryptedVotePart": "ENCRYPT(PART1_DATA, Org3MSP_PUBKEY)"
         }
       ]
     }

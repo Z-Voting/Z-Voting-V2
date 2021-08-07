@@ -5,10 +5,17 @@ import NodeRSA from 'node-rsa';
 import * as path from 'path';
 import {Candidate} from './types/candidate';
 import {Election} from './types/election';
+import {EncryptedVotePart} from './types/encryptedVotePart';
 import {JudgeProposal} from './types/judgeProposal';
 import {OrgIdentity} from './types/orgIdentity';
+import {OrgSignature} from './types/orgSignature';
+import {Vote} from './types/vote';
+import {VoteAuthorizationSection} from './types/voteAuthorizationSection';
 import {VotePart} from './types/votePart';
-import {VoterAuthorization} from './types/voterAuthorization';
+import {VotePartDataFromJudge} from './types/votePartDataFromJudge';
+import {VotePartHashSign} from './types/votePartHashSign';
+import {VotePartPerOrg} from './types/votePartPerOrg';
+import {VoterAuthorizationFromJudge} from './types/voterAuthorizationFromJudge';
 import {buildCCPOrg1, buildWallet} from './utils/AppUtil';
 import {buildCAClient, enrollAdmin, registerAndEnrollUser} from './utils/CAUtil';
 
@@ -244,7 +251,7 @@ async function main() {
                 console.error(e.toString());
             }
 
-            // Get Election Judge Proposals
+            // Get Election Judges
             try {
                 console.log('\n--> Evaluate Transaction: GetJudges');
                 result = await contract.evaluateTransaction('GetJudges', `${electionId}`);
@@ -291,6 +298,9 @@ async function main() {
                 });
             }
 
+            let randomUUID;
+            const authorizationPerJudge = new Map<string, string>();
+
             // BLIND VOTER AUTHORIZATION
             try {
                 console.log(`\n--> Submit Transaction: SubmitVoterAuthorizationRequest`);
@@ -318,7 +328,7 @@ async function main() {
                     judgePubKeys.set(judge.Org, judgePubKey);
                 }
 
-                const randomUUID = await getRandomString(32);
+                randomUUID = await getRandomString(32);
                 console.log('Random UUID: ', randomUUID);
 
                 for (const judge of judges) {
@@ -347,7 +357,7 @@ async function main() {
                 for (const judge of judges) {
                     console.log('\n--> Evaluate Transaction: GetVoterAuthorization');
                     const voterAuthorizationData = await contract.evaluateTransaction('GetVoterAuthorization', `election${electionId}`);
-                    const voterAuthorization = JSON.parse(voterAuthorizationData.toString()) as VoterAuthorization;
+                    const voterAuthorization = JSON.parse(voterAuthorizationData.toString()) as VoterAuthorizationFromJudge;
 
                     const unblindedAuthorization = BlindSignature.unblind({
                         signed: new BigInteger(voterAuthorization.AuthorizationData),
@@ -364,6 +374,7 @@ async function main() {
 
                     if (signVerified) {
                         console.log(`${voterAuthorization.Org}: Signatures verified!`);
+                        authorizationPerJudge.set(judge.Org, unblindedAuthorization.toString());
                     } else {
                         console.log(`${voterAuthorization.Org}: Invalid signature`);
                     }
@@ -396,20 +407,20 @@ async function main() {
                 return JSON.parse(candidatesData.toString()) as Candidate[];
             }
 
-            async function generateVotePartsForCandidate(candidateIdx: number, candidate: Candidate, election: Election, candidates: Candidate[]): Promise<VotePart[]> {
+            async function generateVotePartsForCandidate(candidateIdx: number, candidate: Candidate, election: Election, candidates: Candidate[]): Promise<VotePartDataFromJudge[]> {
                 const voteUUID = await getRandomString(12);
-                const votePartCount = 3; // election.Metadata.VotePartCount;
+                const votePartCount = election.Metadata.VotePartCount;
 
                 let lastVotePartData = new Array<number>(candidates.length).fill(0);
                 lastVotePartData[candidateIdx] = 1;
 
-                const voteParts: VotePart[] = [];
+                const voteParts: VotePartDataFromJudge[] = [];
 
-                for (let votePartNumber = 1; votePartNumber <= votePartCount - 1; votePartNumber++) {
+                for (let votePartNumber = 0; votePartNumber < votePartCount - 1; votePartNumber++) {
                     const votePartData = Array.from({length: candidates.length}, () => Math.floor(Math.random() * election.Metadata.N));
                     // console.log(`${votePartNumber} => ${votePartData}`);
 
-                    const votePart = new VotePart(voteUUID, votePartNumber, votePartData);
+                    const votePart = new VotePartDataFromJudge(voteUUID, votePartNumber, votePartData);
                     votePart.CandidateUniqueId = candidate.UniqueId;
                     voteParts.push(votePart);
 
@@ -418,14 +429,14 @@ async function main() {
 
                 const mod = election.Metadata.N;
                 lastVotePartData = lastVotePartData.map((score) => ((score % mod) + mod) % mod);
-                const lastVotePart = new VotePart(voteUUID, votePartCount, lastVotePartData);
+                const lastVotePart = new VotePartDataFromJudge(voteUUID, votePartCount - 1, lastVotePartData);
                 lastVotePart.CandidateUniqueId = candidate.UniqueId;
                 voteParts.push(lastVotePart);
 
                 return voteParts;
             }
 
-            function verifyVotePartsForCandidate(election: Election, voteParts: VotePart[], candidate?: Candidate) {
+            function verifyVotePartsForCandidate(election: Election, voteParts: VotePartDataFromJudge[], candidate?: Candidate) {
                 voteParts.forEach((votePart) => {
                     const nodeRSAKey = key as NodeRSA;
                     votePart.verify(nodeRSAKey);
@@ -438,16 +449,16 @@ async function main() {
                         const votePartData = votePart1.Data
                             .map((score, i) => score + votePart2.Data[i])
                             .map((score) => ((score % mod) + mod) % mod);
-                        return new VotePart(votePart1.VoteUUID, 0, votePartData);
+                        return new VotePartDataFromJudge(votePart1.VoteRandomId, 0, votePartData);
                     });
 
                 console.log(`Combined: ${JSON.stringify(combinedVote.Data)}`);
             }
 
-            async function generateVotes(election: Election): Promise<VotePart[]> {
+            async function generateVotes(election: Election): Promise<VotePartDataFromJudge[]> {
                 const candidates = await getCandidates(election);
 
-                let voteParts: VotePart[] = [];
+                let voteParts: VotePartDataFromJudge[] = [];
 
                 for (const [idx, candidate] of candidates.entries()) {
                     voteParts = [...voteParts, ...(await generateVotePartsForCandidate(idx, candidate, election, candidates))];
@@ -472,10 +483,10 @@ async function main() {
                 const candidates = await getCandidates(election);
                 console.log(`candidate count: ${candidates.length}`);
 
-                const voteParts = await generateVotes(election);
+                const generatedVotePartsData = await generateVotes(election);
                 const chosenCandidate = candidates[0];
 
-                const chosenVoteParts = voteParts
+                const chosenVotePartsData = generatedVotePartsData
                     .filter((votePart) => votePart.CandidateUniqueId === chosenCandidate.UniqueId)
                     .map((votePart) => {
                         votePart.CandidateUniqueId = null;
@@ -483,12 +494,88 @@ async function main() {
                     });
 
                 console.log(chosenCandidate.Name);
-                verifyVotePartsForCandidate(election, chosenVoteParts);
+                verifyVotePartsForCandidate(election, chosenVotePartsData);
 
-                const votePartPerNumber = new Map<number, VotePart>();
-                chosenVoteParts.forEach((votePart) => votePartPerNumber.set(votePart.VotePartNumber, votePart));
+                const votePartDataFromJudgePerNumber = new Map<number, VotePartDataFromJudge>();
+                chosenVotePartsData.forEach((votePart) => votePartDataFromJudgePerNumber.set(votePart.VotePartNumber, votePart));
 
-                console.log(votePartPerNumber);
+                // console.log('\x1b[45m%s\x1b[0m', '\nVotePartPerNumber:');
+                // console.log(votePartDataFromJudgePerNumber);
+
+                // Aggregate the authorization
+                const voteAuthorizationSection = new VoteAuthorizationSection(randomUUID);
+                authorizationPerJudge.forEach((signature, org) => {
+                    const orgSignature = new OrgSignature(org, signature);
+                    voteAuthorizationSection.Signatures.push(orgSignature);
+                });
+
+                // console.log('\x1b[45m%s\x1b[0m', '\nVoteAuthorizationSection:');
+                // console.log(voteAuthorizationSection);
+
+                // Gather VotePartCount, VotePartsSignedHashes, VoteRandomId
+                const votePartCount = election.Metadata.VotePartCount;
+                const voteRandomId = chosenVotePartsData[0].VoteRandomId;
+
+                // console.log('\x1b[45m%s\x1b[0m', '\nVotePartCount:');
+                // console.log(votePartCount);
+
+                // console.log('\x1b[45m%s\x1b[0m', '\nVoteRandomId:');
+                // console.log(voteRandomId);
+
+                const votePartsSignedHashes = chosenVotePartsData
+                    .map((votePartData) =>
+                        new VotePartHashSign(
+                            votePartData.VotePartNumber,
+                            votePartData.DataHash,
+                            votePartData.DataHashSign,
+                        ));
+
+                // console.log('\x1b[45m%s\x1b[0m', '\nVotePartsSignedHashes:');
+                // console.log(votePartsSignedHashes);
+
+                const votePartsPerOrg = election.Metadata.Judges.map((judge) => {
+                    const votePartForOrg = new VotePartPerOrg(judge.Org);
+
+                    votePartForOrg.EncryptedVoteParts = election.Metadata.VotePartsPerJudge
+                        .filter((orgVotePartList) => orgVotePartList.Org === judge.Org)
+                        .flatMap((orgVotePartList) => orgVotePartList.VoteParts)
+                        .map((votePartNumber) => {
+                            const {
+                                VoteRandomId,
+                                VotePartNumber,
+                                Data,
+                            } = votePartDataFromJudgePerNumber.get(votePartNumber);
+
+                            const votePart = new VotePart(VoteRandomId, VotePartNumber, Data);
+                            return EncryptedVotePart.from(votePart, key);
+                        });
+
+                    return votePartForOrg;
+                });
+
+                // console.log('\x1b[45m%s\x1b[0m', '\nVotePartsPerOrg:');
+                // console.log(JSON.stringify(votePartsPerOrg, null, 4));
+
+                const vote = new Vote(
+                    voteAuthorizationSection,
+                    election.ID,
+                    voteRandomId,
+                    votePartCount,
+                    votePartsSignedHashes,
+                    votePartsPerOrg,
+                );
+
+                console.log('\x1b[45m%s\x1b[0m', '\nVote:');
+                console.log(JSON.stringify(vote, null, 4));
+
+                // // Submit Vote
+                // try {
+                //     console.log('\n--> Submit Transaction: SubmitVote');
+                //     await contract.submitTransaction('SubmitVote', JSON.stringify(vote));
+                //     console.log('*** Result: Vote Submitted');
+                // } catch (e) {
+                //     console.error(e.toString());
+                // }
 
             } catch (e) {
                 console.error(e.toString());

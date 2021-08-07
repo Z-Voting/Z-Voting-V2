@@ -1,4 +1,4 @@
-export class VoterAuthorization {
+export class VoterAuthorizationFromJudge {
     public Org: string;
     public AuthorizationData: string;
 
