@@ -95,7 +95,23 @@ Implementation for Z-Voting V2 protocol
     ]
   },
   "VotePartCount": 3,
-  "VotePartsHash": ["hash#1", "hash#2", "hash#3"],
+  "VotePartsSignedHashes": [
+    {
+      "VotePartNumber": 0,
+      "VotePartHash": "Hash#0",
+      "VotePartHashSign": "SIGN(Hash#0, VOTE_GENERATOR_PRIVKEY)" 
+    },
+    {
+      "VotePartNumber": 1,
+      "VotePartHash": "Hash#1",
+      "VotePartHashSign": "SIGN(Hash#1, VOTE_GENERATOR_PRIVKEY)"
+    },
+    {
+      "VotePartNumber": 2,
+      "VotePartHash": "Hash#2",
+      "VotePartHashSign": "SIGN(Hash#2, VOTE_GENERATOR_PRIVKEY)"
+    }
+  ],
   "VoteRandomId": "RANDOM_STRING()",
   "VotePartsPerOrg": [
     {
