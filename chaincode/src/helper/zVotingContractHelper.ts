@@ -403,8 +403,21 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         //     .map((encryptedVotePartEntry) => new EncryptedVotePartEntry(encryptedVotePartEntry.VotePartNumber, encryptedVotePartEntry.EncryptedVotePart))
         //     .map((encryptedVotePartEntry) => encryptedVotePartEntry.decrypt(privateKey));
 
+        const requiredVoteParts = election.Metadata.VotePartsPerJudge
+            ?.find((votes) => votes.Org === ctx.stub.getMspID())?.VoteParts;
+
+        if (voteParts.length !== requiredVoteParts?.length) {
+            throw new Error(`We should've received ${requiredVoteParts?.length} parts, but ${voteParts.length} parts were provided`);
+        }
+
         const votePartIntegrityMatch = voteParts.every((votePart) => {
             const randomIdMatch = votePart.VoteRandomId === vote.VoteRandomId;
+
+            const votePartAllowed = requiredVoteParts?.includes(votePart.VotePartNumber);
+
+            if (!votePartAllowed) {
+                throw new Error(`Judge ${ctx.stub.getMspID()} should not have received vote part ${votePart.VotePartNumber}`);
+            }
 
             const votePartHash = vote.VotePartsSignedHashes
                 .find((votePartHashSign) => votePartHashSign.VotePartNumber === votePart.VotePartNumber)
