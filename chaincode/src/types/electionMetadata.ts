@@ -30,5 +30,5 @@ export class ElectionMetadata {
     public VotePartCopies?: number;
 
     @Property()
-    public N?: number;
+    public MPCModulus?: number;
 }

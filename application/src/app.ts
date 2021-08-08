@@ -436,7 +436,7 @@ async function main() {
                 const voteParts: VotePartDataFromJudge[] = [];
 
                 for (let votePartNumber = 0; votePartNumber < votePartCount - 1; votePartNumber++) {
-                    const votePartData = Array.from({length: candidates.length}, () => Math.floor(Math.random() * election.Metadata.N));
+                    const votePartData = Array.from({length: candidates.length}, () => Math.floor(Math.random() * election.Metadata.MPCModulus));
                     // console.log(`${votePartNumber} => ${votePartData}`);
 
                     const votePart = new VotePartDataFromJudge(voteUUID, votePartNumber, votePartData);
@@ -446,7 +446,7 @@ async function main() {
                     lastVotePartData = lastVotePartData.map((score, i) => score - votePartData[i]);
                 }
 
-                const mod = election.Metadata.N;
+                const mod = election.Metadata.MPCModulus;
                 lastVotePartData = lastVotePartData.map((score) => ((score % mod) + mod) % mod);
                 const lastVotePart = new VotePartDataFromJudge(voteUUID, votePartCount - 1, lastVotePartData);
                 lastVotePart.CandidateUniqueId = candidate.UniqueId;
@@ -461,7 +461,7 @@ async function main() {
                     votePart.verify(nodeRSAKey);
                 });
 
-                const mod = election.Metadata.N;
+                const mod = election.Metadata.MPCModulus;
                 const combinedVote = voteParts
                     .filter((votePart) => candidate === undefined || votePart.CandidateUniqueId === candidate.UniqueId)
                     .reduce((votePart1, votePart2) => {

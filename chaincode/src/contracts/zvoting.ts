@@ -250,7 +250,7 @@ export class ZVotingContract extends EntityBasedContract {
         election.Metadata.Judges = judges;
         election.Metadata.TrustThreshold = trustThreshold;
         election.Metadata.JudgeCount = judges.length;
-        election.Metadata.N = 1000000007;
+        election.Metadata.MPCModulus = 1000000007;
 
         this.zVotingHelper.calculateDistributionScheme(election);
 

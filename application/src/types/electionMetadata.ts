@@ -17,5 +17,5 @@ export class ElectionMetadata {
 
     public VotePartCopies?: number;
 
-    public N?: number;
+    public MPCModulus?: number;
 }
