@@ -356,4 +356,15 @@ export class ZVotingContract extends EntityBasedContract {
 
         await this.zVotingHelper.saveEntity(ctx, vote);
     }
+
+    @Transaction()
+    public async EndElection(ctx: Context, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        await this.zVotingHelper.checkEndElectionAccess(ctx, election);
+
+        election.Status = ElectionStatus.OVER;
+        await this.zVotingHelper.updateEntity(ctx, election);
+    }
 }

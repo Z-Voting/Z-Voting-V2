@@ -600,6 +600,14 @@ async function main() {
                 console.error(e.toString());
             }
 
+            try {
+                console.log('\n--> Submit Transaction: EndElection');
+                await contract.submitTransaction('EndElection', `election${electionId}`);
+                console.log('*** Result: Election ended');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
         } finally {
             // Disconnect from the gateway when the application is closing
             // This will close all connections to the network

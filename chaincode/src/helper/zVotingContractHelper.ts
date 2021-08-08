@@ -349,6 +349,10 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         if (election.Status !== ElectionStatus.RUNNING) {
             throw new Error(`Election has not started yet.`);
         }
+
+        if (await this.entityExists(ctx, vote.ID)) {
+            throw new Error(`Duplicate Vote Found`);
+        }
     }
 
     public async validateVote(ctx: Context, vote: Vote, election: Election, privateKey: NodeRSA) {
@@ -445,6 +449,21 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         const adminRole = `${ctx.stub.getMspID()}.admin`;
         if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
             throw new Error(`You must be an admin to save private key`);
+        }
+    }
+
+    public async checkEndElectionAccess(ctx: Context, election: Election) {
+        if (!ctx.clientIdentity.assertAttributeValue('election.creator', 'true')) {
+            throw new Error(`You must have election creator role to create an election`);
+        }
+
+        const submittingUserUID = getSubmittingUserUID(ctx);
+        if (election.Owner !== submittingUserUID) {
+            throw new Error(`Only the election owner can add a candidate`);
+        }
+
+        if (election.Status !== ElectionStatus.RUNNING) {
+            throw new Error(`Only running election can be ended, current status: ${election.Status}`);
         }
     }
 }
