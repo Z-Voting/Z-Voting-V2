@@ -9,6 +9,7 @@ import {EncryptedVotePartEntry} from './types/encryptedVotePartEntry';
 import {JudgeProposal} from './types/judgeProposal';
 import {OrgIdentity} from './types/orgIdentity';
 import {OrgSignature} from './types/orgSignature';
+import {PartialElectionResult} from './types/partialElectionResult';
 import {Vote} from './types/vote';
 import {VoteAuthorizationSection} from './types/voteAuthorizationSection';
 import {VotePart} from './types/votePart';
@@ -604,6 +605,27 @@ async function main() {
                 console.log('\n--> Submit Transaction: EndElection');
                 await contract.submitTransaction('EndElection', `election${electionId}`);
                 console.log('*** Result: Election ended');
+            } catch (e) {
+                console.error(e.toString());
+            }
+
+            try {
+                console.log('\n--> Evaluate Transaction: CalculatePartialResult');
+                result = await contract.evaluateTransaction('CalculatePartialResult', `election${electionId}`);
+
+                const partialResults = (JSON.parse(result.toString()) as PartialElectionResult[])
+                    .map(({JudgeOrg, VotePartNumber, Data, JudgeSign}) => {
+                        return new PartialElectionResult(JudgeOrg, VotePartNumber, Data, JudgeSign);
+                    });
+
+                partialResults.forEach((partialResult) => {
+                    if (!partialResult.verifySignature(key)) {
+                        console.error('\x1b[41m%s\x1b[0m', 'Signature Mismatch');
+                    }
+                });
+
+                console.log('\x1b[45m%s\x1b[0m', '\nPartial Results:');
+                console.log(partialResults);
             } catch (e) {
                 console.error(e.toString());
             }

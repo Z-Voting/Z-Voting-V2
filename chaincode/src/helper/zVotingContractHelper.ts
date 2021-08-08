@@ -355,6 +355,18 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         }
     }
 
+    public getVotePartsFromVote(ctx: Context, vote: Vote, privateKey: NodeRSA) {
+        return vote.VotePartsPerOrg
+            .filter((votePartPerOrg) => votePartPerOrg.Org === ctx.stub.getMspID())
+            .flatMap((votePartPerOrg) => votePartPerOrg.EncryptedVoteParts)
+            .map(({VotePartNumber, EncryptedVotePart}) => new EncryptedVotePartEntry(VotePartNumber, EncryptedVotePart))
+            .map((encryptedVotePartEntry) => encryptedVotePartEntry.decrypt(privateKey));
+    }
+
+    public getVotePartsFromVotes(ctx: Context, votes: Vote[], privateKey: NodeRSA) {
+        return votes.flatMap((vote) => this.getVotePartsFromVote(ctx, vote, privateKey));
+    }
+
     public async validateVote(ctx: Context, vote: Vote, election: Election, privateKey: NodeRSA) {
         const judgeIdentities = await this.fetchJudgeIdentities(ctx, election);
 
@@ -394,11 +406,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
             return;
         }
 
-        const voteParts = vote.VotePartsPerOrg
-            .filter((votePartPerOrg) => votePartPerOrg.Org === ctx.stub.getMspID())
-            .flatMap((votePartPerOrg) => votePartPerOrg.EncryptedVoteParts)
-            .map(({VotePartNumber, EncryptedVotePart}) => new EncryptedVotePartEntry(VotePartNumber, EncryptedVotePart))
-            .map((encryptedVotePartEntry) => encryptedVotePartEntry.decrypt(privateKey));
+        const voteParts = this.getVotePartsFromVote(ctx, vote, privateKey);
         console.log(JSON.stringify(voteParts, null, 2));
 
         // const voteParts = vote.VotePartsPerOrg
@@ -465,5 +473,21 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         if (election.Status !== ElectionStatus.RUNNING) {
             throw new Error(`Only running election can be ended, current status: ${election.Status}`);
         }
+    }
+
+    public async getVotesForElection(ctx: Context, election: Election) {
+        const query: any = {};
+        query.selector = {};
+
+        query.selector.DocType = 'vote';
+        query.selector.ElectionId = election.ID;
+
+        const votesData = await this.queryLedger(ctx, JSON.stringify(query));
+
+        return JSON.parse(votesData) as Vote[];
+    }
+
+    public calculateSum(data1: number[], data2: number[], MPCModulus: number) {
+        return data1.map((val, i) => (val % MPCModulus + data2[i] % MPCModulus) % MPCModulus);
     }
 }

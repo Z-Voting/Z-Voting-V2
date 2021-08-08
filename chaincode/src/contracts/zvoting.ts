@@ -8,6 +8,7 @@ import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
 import {OrgIdentity} from '../types/orgIdentity';
+import {PartialElectionResult} from '../types/partialElectionResult';
 import {Vote} from '../types/vote';
 import {Voter} from '../types/voter';
 import {VoterAuthorization} from '../types/voterAuthorization';
@@ -366,5 +367,43 @@ export class ZVotingContract extends EntityBasedContract {
 
         election.Status = ElectionStatus.OVER;
         await this.zVotingHelper.updateEntity(ctx, election);
+    }
+
+    @Transaction(false)
+    public async CalculatePartialResult(ctx: Context, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        const votes = await this.zVotingHelper.getVotesForElection(ctx, election);
+        const voteParts = this.zVotingHelper.getVotePartsFromVotes(ctx, votes, this.ownPrivateKey!);
+
+        const partialResults: PartialElectionResult[] = [];
+
+        election.Metadata.VotePartsPerJudge!
+            .filter((orgVotePartList) => orgVotePartList.Org === ctx.stub.getMspID())
+            .flatMap((orgVotePartList) => orgVotePartList.VoteParts)
+            .forEach((votePartNumber) => {
+
+                const validVoteParts = voteParts
+                    .filter((votePart) => votePart.VotePartNumber === votePartNumber);
+
+                const resultData = validVoteParts
+                    .map((votePart) => votePart.Data)
+                    .reduce((scoreList1, scoreList2) => {
+                        return this.zVotingHelper.calculateSum(scoreList1, scoreList2, election.Metadata.MPCModulus!);
+                    });
+
+                const partialResult = new PartialElectionResult(
+                    ctx.stub.getMspID(),
+                    votePartNumber,
+                    resultData,
+                    undefined,
+                    this.ownPrivateKey!,
+                );
+
+                partialResults.push(partialResult);
+            });
+
+        return partialResults;
     }
 }
