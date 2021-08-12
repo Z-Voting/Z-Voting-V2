@@ -5,6 +5,7 @@ import NodeRSA from 'node-rsa';
 import * as path from 'path';
 import {Candidate} from './types/candidate';
 import {Election} from './types/election';
+import {ElectionResult} from './types/electionResult';
 import {EncryptedVotePartEntry} from './types/encryptedVotePartEntry';
 import {JudgeProposal} from './types/judgeProposal';
 import {OrgIdentity} from './types/orgIdentity';
@@ -611,12 +612,25 @@ async function main() {
 
             try {
                 console.log('\n--> Evaluate Transaction: CalculatePartialResult');
-                result = await contract.evaluateTransaction('CalculatePartialResult', `election${electionId}`);
+                const electionData = await contract.evaluateTransaction('GetElection', `${electionId}`);
+                const election = JSON.parse(electionData.toString()) as Election;
 
-                const partialResults = (JSON.parse(result.toString()) as PartialElectionResult[])
-                    .map(({JudgeOrg, VotePartNumber, Data, JudgeSign}) => {
-                        return new PartialElectionResult(JudgeOrg, VotePartNumber, Data, JudgeSign);
-                    });
+                const partialResults: PartialElectionResult[] = [];
+
+                for (const judge of election.Metadata.Judges!) {
+                    const judgeOrg = judge.Org;
+
+                    const queryResult = await contract.createTransaction('CalculatePartialResult')
+                        .setEndorsingOrganizations(judgeOrg)
+                        .evaluate(`election${electionId}`);
+
+                    const partialResultsFromJudge = (JSON.parse(queryResult.toString()) as PartialElectionResult[])
+                        .map(({JudgeOrg, VotePartNumber, Data, JudgeSign}) => {
+                            return new PartialElectionResult(election.ID, JudgeOrg, VotePartNumber, Data, JudgeSign);
+                        });
+
+                    partialResults.push(...partialResultsFromJudge);
+                }
 
                 partialResults.forEach((partialResult) => {
                     if (!partialResult.verifySignature(key)) {
@@ -626,6 +640,22 @@ async function main() {
 
                 console.log('\x1b[45m%s\x1b[0m', '\nPartial Results:');
                 console.log(partialResults);
+
+                try {
+                    console.log('\n--> Submit Transaction: PublishResult');
+                    await contract.submitTransaction('PublishResult', `election${electionId}`, JSON.stringify(partialResults));
+                    console.log('*** Result: Result Published');
+                } catch (e) {
+                    console.error(e.toString());
+                }
+
+                try {
+                    result = await contract.evaluateTransaction('GetElectionResult', `election${electionId}`);
+                    const electionResult = JSON.parse(result.toString()) as ElectionResult;
+                    console.log(`*** Result:\n${JSON.stringify(electionResult, null, 4)}`);
+                } catch (e) {
+                    console.error(e.toString());
+                }
             } catch (e) {
                 console.error(e.toString());
             }

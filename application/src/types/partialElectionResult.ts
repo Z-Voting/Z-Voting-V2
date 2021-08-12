@@ -2,6 +2,8 @@ import NodeRSA from 'node-rsa';
 
 export class PartialElectionResult {
 
+    public ElectionId: string;
+
     public JudgeOrg: string;
 
     public VotePartNumber: number;
@@ -10,9 +12,10 @@ export class PartialElectionResult {
 
     public JudgeSign?: string;
 
-    constructor(JudgeOrg: string, VotePartNumber: number, Data: number[], JudgeSign?: string, privateKey?: NodeRSA) {
+    constructor(ElectionId: string, JudgeOrg: string, VotePartNumber: number, Data: number[], JudgeSign?: string, privateKey?: NodeRSA) {
         this.VotePartNumber = VotePartNumber;
         this.Data = Data;
+        this.ElectionId = ElectionId;
         this.JudgeOrg = JudgeOrg;
 
         if (JudgeSign) {

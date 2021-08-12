@@ -1,4 +1,6 @@
 import {Object, Property} from 'fabric-contract-api';
+import {BigInteger} from 'jsbn';
+import NodeRSA from 'node-rsa';
 
 @Object()
 export class OrgIdentity {
@@ -24,5 +26,17 @@ export class OrgIdentity {
         this.Org = Org;
         this.N = N;
         this.E = E;
+    }
+
+    public getPublicKey() {
+        const nHex = new BigInteger(this.N).toString(16);
+
+        const publicKey = new NodeRSA();
+        publicKey.importKey({
+            n: Buffer.from(nHex, 'hex'),
+            e: Number(this.E),
+        }, 'components-public');
+
+        return publicKey;
     }
 }

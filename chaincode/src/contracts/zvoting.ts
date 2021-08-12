@@ -6,6 +6,7 @@ import {getSubmittingUserOrg, getSubmittingUserUID} from '../helper/contractHelp
 import {ZVotingContractHelper} from '../helper/zVotingContractHelper';
 import {Candidate} from '../types/candidate';
 import {Election, ElectionStatus} from '../types/election';
+import {ElectionResult} from '../types/electionResult';
 import {JudgeProposal, JudgeProposalStatus} from '../types/judgeProposal';
 import {OrgIdentity} from '../types/orgIdentity';
 import {PartialElectionResult} from '../types/partialElectionResult';
@@ -374,6 +375,8 @@ export class ZVotingContract extends EntityBasedContract {
         electionId = this.zVotingHelper.formatElectionId(electionId);
         const election = await this.FindElection(ctx, electionId);
 
+        await this.zVotingHelper.checkCalculatePartialResultAccess(ctx, election);
+
         const votes = await this.zVotingHelper.getVotesForElection(ctx, election);
         const voteParts = this.zVotingHelper.getVotePartsFromVotes(ctx, votes, this.ownPrivateKey!);
 
@@ -394,6 +397,7 @@ export class ZVotingContract extends EntityBasedContract {
                     });
 
                 const partialResult = new PartialElectionResult(
+                    election.ID,
                     ctx.stub.getMspID(),
                     votePartNumber,
                     resultData,
@@ -405,5 +409,42 @@ export class ZVotingContract extends EntityBasedContract {
             });
 
         return partialResults;
+    }
+
+    @Transaction()
+    public async PublishResult(ctx: Context, electionId: string, partialResultsData: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+        const election = await this.FindElection(ctx, electionId);
+
+        await this.zVotingHelper.checkPublishResultAccess(ctx, election);
+
+        const partialElectionResults = (JSON.parse(partialResultsData) as PartialElectionResult[])
+            .map(({ElectionId, JudgeOrg, VotePartNumber, Data, JudgeSign}) => {
+                return new PartialElectionResult(ElectionId, JudgeOrg, VotePartNumber, Data, JudgeSign);
+            });
+
+        await this.zVotingHelper.validatePartialElectionResults(ctx, partialElectionResults, election);
+
+        const partialResultPerVoteNumber = new Map<number, number[]>();
+
+        partialElectionResults.forEach(({VotePartNumber, Data}) => {
+            partialResultPerVoteNumber.set(VotePartNumber, Data);
+        });
+
+        const modulus = election.Metadata.MPCModulus!;
+        const combinedElectionResultData = Array.from(partialResultPerVoteNumber.values())
+            .reduce((data1, data2) => {
+                return data1.map((val, idx) => (val % modulus  + data2[idx] % modulus) % modulus);
+            });
+
+        const electionResult = new ElectionResult(electionId, combinedElectionResultData, partialElectionResults);
+        await this.zVotingHelper.saveEntity(ctx, electionResult);
+    }
+
+    @Transaction(false)
+    public async GetElectionResult(ctx: Context, electionId: string) {
+        electionId = this.zVotingHelper.formatElectionId(electionId);
+
+        return this.zVotingHelper.readEntityData(ctx, `electionResult_${electionId}`);
     }
 }

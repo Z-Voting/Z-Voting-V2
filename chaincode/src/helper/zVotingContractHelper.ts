@@ -1,11 +1,13 @@
 import {Context} from 'fabric-contract-api';
 import {BigInteger} from 'jsbn';
+import _ from 'lodash';
 import NodeRSA from 'node-rsa';
 import {Election, ElectionStatus} from '../types/election';
 import {EncryptedVotePartEntry} from '../types/encryptedVotePartEntry';
 import {JudgeProposal} from '../types/judgeProposal';
 import {OrgIdentity} from '../types/orgIdentity';
 import {OrgVotePartList} from '../types/orgVotePartList';
+import {PartialElectionResult} from '../types/partialElectionResult';
 import {Vote} from '../types/vote';
 import {Voter} from '../types/voter';
 import {getImplicitPrivateCollection, getSubmittingUserOrg, getSubmittingUserUID} from './contractHelper';
@@ -331,7 +333,9 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
 
     public async fetchOrgIdentity(ctx: Context, org: string) {
         const orgIdentityJSON = (await ctx.stub.getState(`orgIdentity_${org}`)).toString();
-        return JSON.parse(orgIdentityJSON) as OrgIdentity;
+
+        const {Org, N, E} = JSON.parse(orgIdentityJSON) as OrgIdentity;
+        return new OrgIdentity(Org, N, E);
     }
 
     public async fetchJudgeIdentities(ctx: Context, election: Election) {
@@ -489,5 +493,83 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
 
     public calculateSum(data1: number[], data2: number[], MPCModulus: number) {
         return data1.map((val, i) => (val % MPCModulus + data2[i] % MPCModulus) % MPCModulus);
+    }
+
+    public async checkCalculatePartialResultAccess(ctx: Context, election: Election) {
+        const adminRole = `${getSubmittingUserOrg(ctx)}.admin`;
+        if (!ctx.clientIdentity.assertAttributeValue(adminRole, 'true')) {
+            throw new Error(`You must be an admin to trigger result calculation`);
+        }
+
+        if (election.Status !== ElectionStatus.OVER) {
+            throw new Error(`Election must be over to trigger result calculation`);
+        }
+    }
+
+    public async checkPublishResultAccess(ctx: Context, election: Election) {
+        const submittingUserUID = getSubmittingUserUID(ctx);
+        if (election.Owner !== submittingUserUID) {
+            throw new Error(`Only the election owner can Publish Result`);
+        }
+
+        if (election.Status !== ElectionStatus.OVER) {
+            throw new Error(`Election must be over to publish result`);
+        }
+    }
+
+    public async getPublicKeyPerJudgeOrg(ctx: Context, election: Election) {
+        const publicKeyPerJudgeOrg = new Map<string, NodeRSA>();
+
+        for (const judge of election.Metadata.Judges!) {
+            const orgIdentity = await this.fetchOrgIdentity(ctx, judge.Org);
+
+            const publicKey = orgIdentity.getPublicKey();
+            publicKeyPerJudgeOrg.set(judge.Org, publicKey);
+        }
+
+        return publicKeyPerJudgeOrg;
+    }
+
+    public async validatePartialElectionResults(ctx: Context, partialElectionResults: PartialElectionResult[], election: Election) {
+        const publicKeyPerJudge = await this.getPublicKeyPerJudgeOrg(ctx, election);
+
+        const signatureVerified = partialElectionResults.every((partialResult) => {
+            const judgePublicKey = publicKeyPerJudge.get(partialResult.JudgeOrg)!;
+            return partialResult.verifySignature(judgePublicKey);
+        });
+
+        if (!signatureVerified) {
+            throw new Error('Partial Result Signature Mismatch');
+        }
+
+        partialElectionResults.forEach((partialResult) => {
+            if (partialResult.ElectionId !== election.ID) {
+                throw new Error('This partial election result is for another election');
+            }
+        });
+
+        for (let votePartNumber = 0; votePartNumber < election.Metadata.VotePartCount!; votePartNumber += 1) {
+            const partialResultsForVotePart = partialElectionResults
+                .filter((partialElectionResult) => partialElectionResult.VotePartNumber === votePartNumber);
+
+            if (partialResultsForVotePart.length === 0) {
+                throw new Error(`Partial Election Result not found for vote part ${votePartNumber}`);
+            }
+
+            if (partialResultsForVotePart.length !== election.Metadata.VotePartCopies) {
+                throw new Error('Partial Result Copy Count Mismatch');
+            }
+
+            const partialResultJudges = partialResultsForVotePart.map((partialElectionResult) => partialElectionResult.JudgeOrg);
+            if (!_.isEqual(partialResultJudges, election.Metadata.JudgesPerVotePart![votePartNumber])) {
+                throw new Error('Judge List Mismatch in metadata and result parts');
+            }
+
+            partialResultsForVotePart.forEach((partialResult) => {
+                if (!_.isEqual(partialResult.Data, partialResultsForVotePart[0].Data)) {
+                    throw new Error(`Data Mismatch between ${partialResult.JudgeOrg} and ${partialResultsForVotePart[0].JudgeOrg}`);
+                }
+            });
+        }
     }
 }
