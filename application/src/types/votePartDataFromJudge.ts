@@ -13,14 +13,23 @@ export class VotePartDataFromJudge {
 
     public DataHash: string;
 
-    public DataHashSign: string;
+    public DataHashSign?: string;
 
-    constructor(VoteUUID: string, VotePartNumber: number, Data: number[]) {
+    constructor(CandidateUniqueId: string, VoteUUID: string, VotePartNumber: number, Data: number[], DataHashSign?: string, privateKey?: NodeRSA) {
+        this.CandidateUniqueId = CandidateUniqueId;
         this.Data = Data;
         this.VotePartNumber = VotePartNumber;
         this.VoteRandomId = VoteUUID;
 
         this.DataHash = this.generateHash();
+
+        if (DataHashSign) {
+            this.DataHashSign = DataHashSign;
+        }
+
+        if (privateKey) {
+            this.DataHashSign = this.signHash(privateKey);
+        }
     }
 
     public generateHash() {
@@ -39,10 +48,14 @@ export class VotePartDataFromJudge {
     }
 
     public signHash(key: NodeRSA) {
-        this.DataHashSign = key.sign(this.generateHash(), 'base64');
+        return key.sign(this.generateHash(), 'base64');
     }
 
     public verifySign(key: NodeRSA) {
+        if (this.DataHashSign === undefined) {
+            return false;
+        }
+
         if (!key.verify(this.DataHash, this.DataHashSign, undefined, 'base64')) {
             throw new Error(`Signature Verification failed`);
         }

@@ -10,11 +10,11 @@ export class VotePartHashSign {
     public VotePartHash: string;
 
     @Property()
-    public VotePartHashSign: string;
+    public Signature: string;
 
-    constructor(votePartNumber: number, votePartHash: string, votePartHashSign: string) {
+    constructor(votePartNumber: number, votePartHash: string, Signature: string) {
         this.VotePartNumber = votePartNumber;
         this.VotePartHash = votePartHash;
-        this.VotePartHashSign = votePartHashSign;
+        this.Signature = Signature;
     }
 }

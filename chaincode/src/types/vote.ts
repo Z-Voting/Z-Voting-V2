@@ -51,7 +51,7 @@ export class Vote {
     @Property()
     public VotePartCount: number;
 
-    @Property('VotePartsSignedHashes', 'VotePartHashSign[]')
+    @Property('VotePartsSignedHashes', 'Signature[]')
     public VotePartsSignedHashes: VotePartHashSign[];
 
     @Property('VotePartsPerOrg', 'VotePartPerOrg[]')

@@ -4,12 +4,11 @@ export class VotePartHashSign {
 
     public VotePartHash: string;
 
-    public VotePartHashSign: string;
+    public Signature: string;
 
-
-    constructor(VotePartNumber: number, VotePartHash: string, VotePartHashSign: string) {
+    constructor(VotePartNumber: number, VotePartHash: string, Signature: string) {
         this.VotePartNumber = VotePartNumber;
         this.VotePartHash = VotePartHash;
-        this.VotePartHashSign = VotePartHashSign;
+        this.Signature = Signature;
     }
 }

@@ -392,7 +392,7 @@ export class ZVotingContractHelper extends EntityBasedContractHelper {
         const hashSignMatch = vote.VotePartsSignedHashes.every((votePartHashSign) => {
             return voteGeneratorPublicKey.verify(
                 votePartHashSign.VotePartHash,
-                votePartHashSign.VotePartHashSign,
+                votePartHashSign.Signature,
                 undefined,
                 'base64',
             );
